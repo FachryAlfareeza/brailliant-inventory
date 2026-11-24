@@ -16,8 +16,8 @@ EDGE_CANDIDATES = [
 ]
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--niu", default="[NIU]")
-ap.add_argument("--name", default="[Full name]")
+ap.add_argument("--niu", default="540199")
+ap.add_argument("--name", default="Muhammad Fachry Alfareeza")
 opts = ap.parse_args()
 
 edge = next((p for p in EDGE_CANDIDATES if pathlib.Path(p).exists()), None)
