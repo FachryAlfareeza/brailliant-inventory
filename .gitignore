@@ -9,3 +9,4 @@ docs/_brief_render.html
 submission/
 .venv-sam/
 .aws-sam/
+evidence/private/

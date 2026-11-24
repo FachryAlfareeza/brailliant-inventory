@@ -1,20 +1,22 @@
 # AWS evidence (Week 12)
 
-## A. Local emulation evidence (use this while AWS access is blocked)
+## A. Local emulation evidence (submitted, 25 Nov 2026)
 
-Label these clearly as **local emulation (SAM CLI + DynamoDB Local)** in the submission.
+**Start with [Week12_Evidence_Local.pdf](Week12_Evidence_Local.pdf)**, which bundles everything below with captions.
+Rebuild it with `python evidence/build_evidence_pdf.py`.
 
-| File | What to capture |
+| File | Shows |
 |---|---|
-| `L1_docker_containers.png` | Docker Desktop → Containers: `kompaw-dynamodb` and the SAM Lambda container running |
-| `L2_sam_start.png` | terminal 1 after `bash local/start.sh`: `sam validate --lint` OK, `Build Succeeded`, and the mounted routes `/parts`, `/parts/{partId}`, `/health` |
-| `L3_smoke_test.png` | terminal 2: `infra/smoke_test.sh http://127.0.0.1:3000` ending `Result: 0 failure(s)` |
-| `L4_seed_and_count.png` | `python infra/seed.py http://127.0.0.1:3000` (201: 98) and the DynamoDB Local scan count (98) |
-| `L5_browser_get.png` | browser at `http://127.0.0.1:3000/parts/BOM-005` showing the JSON item |
-| `L6_lambda_logs.png` | terminal 1 scrolled to the `START RequestId … END … REPORT` invocation logs |
-| `L7_aws_block_notice.png` | the AWS email or page saying the account is blocked (hide personal details) |
+| `L1_docker_containers.png` | DynamoDB Local container and the SAM Lambda runtime container |
+| `L2_sam_build_and_start.png` | `sam build` succeeded, the API routes are mounted on http://127.0.0.1:3000 |
+| `L3_smoke_test_pass.png` | CRUD smoke test, `Result: 0 failure(s)` |
+| `L4_dynamodb_local_count.png` | 98 BOM parts stored in table `brailliant-parts` |
+| `L5_get_part_BOM-005.png` | `GET /parts/BOM-005` returning the item |
+| `L6_lambda_invocation_logs.png` | Lambda START/END/REPORT logs per request |
+| `L7_aws_suspension_notice_redacted.pdf` | Why there is no cloud evidence: AWS suspension email, with the email, account ID and upload token blacked out |
+| `local_smoke_test_output.txt` | full text output of the smoke test |
 
-`local_smoke_test_output.txt` is written automatically.
+The unredacted original is kept in `evidence/private/`, which git ignores. Never commit it.
 
 ## B. Real AWS evidence (once access is restored)
 
