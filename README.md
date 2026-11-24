@@ -63,7 +63,7 @@ Result: `/health` and the CRUD smoke test pass 9/9, and all 98 BOM parts load (s
 
 Requirements: Docker Desktop running, AWS CLI v2, and SAM CLI. **On Windows, run the scripts in Git Bash.**
 In PowerShell, plain `bash` starts WSL, which can't see Docker Desktop, so use
-`& "C:\Program Files\Gitinash.exe" local/start.sh` there. Without admin rights you can install SAM CLI into a venv:
+`& "C:\Program Files\Git\bin\bash.exe" local/start.sh` there. Without admin rights you can install SAM CLI into a venv:
 `python -m venv .venv-sam && .venv-sam/Scripts/python -m pip install aws-sam-cli`.
 
 ```bash
