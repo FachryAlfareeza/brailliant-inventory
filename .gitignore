@@ -1,0 +1,9 @@
+build/
+__pycache__/
+*.pyc
+infra/.api_url
+docs/_brief_render.html
+.aws/
+*.pem
+.env
+submission/
