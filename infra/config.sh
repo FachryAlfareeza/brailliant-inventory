@@ -1,3 +1,10 @@
+# Under PowerShell, plain "bash" starts WSL, which can't see Docker Desktop or the Windows tools.
+if [[ "$(uname -s)" == Linux* ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  echo "This is WSL bash. Run the script with Git Bash instead, e.g. from PowerShell:"
+  echo '  & "C:\Program Files\Git\bin\bash.exe" '"$0"
+  exit 1
+fi
+
 # Shared settings for the deploy / smoke-test / teardown scripts.
 # Works on a personal AWS account (default) and on AWS Academy Learner Lab
 # (detected automatically from the caller ARN).

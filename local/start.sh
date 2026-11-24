@@ -3,6 +3,12 @@
 #   SAM CLI "sam local start-api"  ->  Lambda container (python3.13)  ->  DynamoDB Local container
 # The API listens on http://127.0.0.1:3000. Press Ctrl+C to stop it; run local/stop.sh to remove the DB.
 set -euo pipefail
+# Under PowerShell, plain "bash" starts WSL, which can't see Docker Desktop or the Windows tools.
+if [[ "$(uname -s)" == Linux* ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  echo "This is WSL bash. Run the script with Git Bash instead, e.g. from PowerShell:"
+  echo '  & "C:\Program Files\Git\bin\bash.exe" '"$0"
+  exit 1
+fi
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1 AWS_PAGER=""
 
