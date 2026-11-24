@@ -1,0 +1,53 @@
+API test - http://127.0.0.1:3000 - 2026-11-25 01:18:39
+
+# health check (API -> Lambda -> DynamoDB)
+$ curl -X GET http://127.0.0.1:3000/health 
+{"status": "ok", "table": "brailliant-parts", "tableStatus": "ACTIVE", "itemCount": 0, "time": "2026-11-24T18:18:42+00:00"}
+HTTP 200
+PASS
+
+# create
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"partId":"TEST-1795544319","section":"Carrier board","reference":"U2","description":"BQ25895RTWR charger","partNumber":"BQ25895RTWR","package":"WQFN-24","qtyPerDevice":1,"qtyInStock":3,"unitCostLow":1.06,"unitCostHigh":2.23,"location":"Drawer A1"}'
+{"section": "Carrier board", "reference": "U2", "description": "BQ25895RTWR charger", "partNumber": "BQ25895RTWR", "package": "WQFN-24", "qtyPerDevice": 1, "qtyInStock": 3, "unitCostLow": 1.06, "unitCostHigh": 2.23, "location": "Drawer A1", "partId": "TEST-1795544319", "createdAt": "2026-11-24T18:18:43+00:00", "updatedAt": "2026-11-24T18:18:43+00:00"}
+HTTP 201
+PASS
+
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"partId":"TEST-1795544319","description":"same id again","qtyInStock":1}'
+{"error": "Part 'TEST-1795544319' already exists"}
+HTTP 409
+PASS
+
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"description":"no qty"}'
+{"error": "Missing required field: qtyInStock"}
+HTTP 400
+PASS
+
+# read
+$ curl -X GET http://127.0.0.1:3000/parts/TEST-1795544319 
+{"package": "WQFN-24", "qtyInStock": 3, "partId": "TEST-1795544319", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T18:18:43+00:00", "partNumber": "BQ25895RTWR", "location": "Drawer A1", "updatedAt": "2026-11-24T18:18:43+00:00"}
+HTTP 200
+PASS
+
+$ curl -X GET http://127.0.0.1:3000/parts?section=Carrier%20board 
+{"count": 1, "items": [{"package": "WQFN-24", "qtyInStock": 3, "partId": "TEST-1795544319", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T18:18:43+00:00", "partNumber": "BQ25895RTWR", "location": "Drawer A1", "updatedAt": "2026-11-24T18:18:43+00:00"}]}
+HTTP 200
+PASS
+
+# update
+$ curl -X PUT http://127.0.0.1:3000/parts/TEST-1795544319 -d '{"qtyInStock":10,"location":"Drawer B2"}'
+{"package": "WQFN-24", "qtyInStock": 10, "partId": "TEST-1795544319", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T18:18:43+00:00", "location": "Drawer B2", "partNumber": "BQ25895RTWR", "updatedAt": "2026-11-24T18:18:51+00:00"}
+HTTP 200
+PASS
+
+# delete
+$ curl -X DELETE http://127.0.0.1:3000/parts/TEST-1795544319 
+{"deleted": "TEST-1795544319"}
+HTTP 200
+PASS
+
+$ curl -X GET http://127.0.0.1:3000/parts/TEST-1795544319 
+{"error": "Part 'TEST-1795544319' not found"}
+HTTP 404
+PASS
+
+Failed: 0

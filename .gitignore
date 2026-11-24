@@ -1,8 +1,8 @@
 build/
 __pycache__/
 *.pyc
-infra/.api_url
-docs/_brief_render.html
+scripts/.api_url
+docs/_tmp_brief.html
 .aws/
 *.pem
 .env

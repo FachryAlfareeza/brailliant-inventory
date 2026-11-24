@@ -1,7 +1,5 @@
-"""Local unit tests for src/app.py. No AWS account needed: DynamoDB is faked.
-
-Run:  python -m unittest discover -s tests -v
-"""
+# Unit tests for src/app.py with a fake table, so no AWS account is needed.
+# Run: python -m unittest discover -s tests -v
 import json
 import os
 import sys
@@ -18,8 +16,8 @@ def _conditional_fail():
                                   "Message": "condition failed"}}, "op")
 
 
+# only implements the Table methods that app.py uses
 class FakeTable:
-    """Just enough of the boto3 Table API for app.py."""
 
     def __init__(self):
         self.items = {}
@@ -35,7 +33,6 @@ class FakeTable:
 
     @staticmethod
     def _cond(expr):
-        # Attr("partId").exists() / .not_exists() -> expression name
         return type(expr).__name__ if expr is not None else None
 
     def put_item(self, Item, ConditionExpression=None):

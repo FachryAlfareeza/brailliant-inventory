@@ -1,18 +1,17 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  BrAIlliant Parts Inventory API (Track C, serverless).
-  API Gateway HTTP API -> Lambda (Python 3.13) -> DynamoDB.
-  Same stack as infra/deploy.sh, written as infrastructure as code.
-  Local:  bash local/start.sh       (SAM CLI + DynamoDB Local in Docker)
-  AWS:    sam build && sam deploy --guided
+Description: BrAIlliant parts inventory API (API Gateway HTTP API + Lambda + DynamoDB)
+
+# Same resources as scripts/deploy.sh, but as a SAM template.
+# Local test: bash scripts/local_start.sh
+# Deploy:     sam build && sam deploy --guided
 
 Parameters:
   Architecture:
     Type: String
     Default: arm64
     AllowedValues: [arm64, x86_64]
-    Description: arm64 on AWS (cheaper); local/start.sh overrides it to x86_64 for the PC.
+    Description: arm64 on AWS, x86_64 when testing locally
 
 Globals:
   Function:
@@ -57,9 +56,8 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref PartsTable
-          DYNAMODB_ENDPOINT: ""   # local/env.json points this at DynamoDB Local
-      # Least privilege: only these actions, only on this table.
-      # (SAM adds CloudWatch Logs write permission to the generated role.)
+          DYNAMODB_ENDPOINT: ""   # set in scripts/local_env.json for local testing
+      # only CRUD on this table (SAM adds the CloudWatch Logs permissions itself)
       Policies:
         - Statement:
             - Sid: PartsTableCrud
