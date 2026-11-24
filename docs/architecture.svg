@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/>
+    </marker>
+    <style>
+      .t{font-size:15px;font-weight:700;fill:#111827}
+      .s{font-size:12px;fill:#374151}
+      .x{font-size:11px;fill:#4b5563}
+      .lbl{font-size:12px;fill:#111827;font-weight:600}
+      .lblg{font-size:11.5px;fill:#4b5563}
+      .lblr{font-size:11.5px;fill:#b91c1c;font-weight:600}
+      .box{rx:10;stroke-width:1.6}
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="#ffffff"/>
+  <text x="30" y="38" font-size="22" font-weight="700" fill="#111827">BrAIlliant Parts Inventory — Track C (Serverless) architecture</text>
+  <text x="30" y="60" class="s">Entity: Part (partId) · 4 CRUD operations + health check · AWS Learner Lab, us-east-1 · no VPC, no servers, pay-per-request</text>
+
+  <!-- Clients -->
+  <rect x="30" y="150" width="190" height="150" class="box" fill="#f3f4f6" stroke="#6b7280"/>
+  <text x="125" y="178" text-anchor="middle" class="t">Clients</text>
+  <text x="125" y="202" text-anchor="middle" class="s">curl / smoke_test.sh</text>
+  <text x="125" y="220" text-anchor="middle" class="s">seed.py (98 BOM parts)</text>
+  <text x="125" y="238" text-anchor="middle" class="s">browser / Postman</text>
+  <text x="125" y="264" text-anchor="middle" class="x">BrAIlliant build team</text>
+  <text x="125" y="280" text-anchor="middle" class="x">(stock of prototype parts)</text>
+
+  <!-- AWS cloud boundary -->
+  <rect x="270" y="90" width="900" height="420" rx="14" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="290" y="114" font-size="14" font-weight="700" fill="#b45309">AWS Cloud · Region us-east-1 (Learner Lab account)</text>
+
+  <!-- API Gateway -->
+  <rect x="300" y="140" width="250" height="200" class="box" fill="#f5f3ff" stroke="#7c3aed"/>
+  <text x="425" y="166" text-anchor="middle" class="t">Amazon API Gateway</text>
+  <text x="425" y="184" text-anchor="middle" class="s">HTTP API · stage $default</text>
+  <text x="316" y="210" class="x" font-family="Consolas, monospace">POST   /parts</text>
+  <text x="316" y="226" class="x" font-family="Consolas, monospace">GET    /parts[?section=]</text>
+  <text x="316" y="242" class="x" font-family="Consolas, monospace">GET    /parts/{partId}</text>
+  <text x="316" y="258" class="x" font-family="Consolas, monospace">PUT    /parts/{partId}</text>
+  <text x="316" y="274" class="x" font-family="Consolas, monospace">DELETE /parts/{partId}</text>
+  <text x="316" y="290" class="x" font-family="Consolas, monospace">GET    /health</text>
+  <text x="425" y="316" text-anchor="middle" class="x">TLS endpoint · CORS · throttle 10 rps</text>
+  <text x="425" y="331" text-anchor="middle" class="x">burst 20 (caps spend)</text>
+
+  <!-- Lambda -->
+  <rect x="620" y="140" width="230" height="200" class="box" fill="#fff7ed" stroke="#ea580c"/>
+  <text x="735" y="166" text-anchor="middle" class="t">AWS Lambda</text>
+  <text x="735" y="184" text-anchor="middle" class="s">brailliant-parts-api</text>
+  <text x="735" y="210" text-anchor="middle" class="x">Python 3.13 · arm64 · 128 MB · 10 s</text>
+  <text x="735" y="228" text-anchor="middle" class="x">handler app.lambda_handler</text>
+  <text x="735" y="246" text-anchor="middle" class="x">routes by routeKey, validates</text>
+  <text x="735" y="262" text-anchor="middle" class="x">body, returns JSON + status</text>
+  <text x="735" y="288" text-anchor="middle" class="x">env TABLE_NAME=brailliant-parts</text>
+  <text x="735" y="318" text-anchor="middle" class="lblr">execution role: LabRole</text>
+
+  <!-- DynamoDB -->
+  <rect x="920" y="140" width="230" height="200" class="box" fill="#eff6ff" stroke="#2563eb"/>
+  <text x="1035" y="166" text-anchor="middle" class="t">Amazon DynamoDB</text>
+  <text x="1035" y="184" text-anchor="middle" class="s">table brailliant-parts</text>
+  <text x="1035" y="210" text-anchor="middle" class="x">PK partId (String)</text>
+  <text x="1035" y="226" text-anchor="middle" class="x">on-demand (PAY_PER_REQUEST)</text>
+  <text x="936" y="252" class="x">section · reference · description</text>
+  <text x="936" y="268" class="x">partNumber · package · location</text>
+  <text x="936" y="284" class="x">qtyPerDevice · qtyInStock</text>
+  <text x="936" y="300" class="x">unitCostLow · unitCostHigh</text>
+  <text x="936" y="316" class="x">createdAt · updatedAt</text>
+
+  <!-- CloudWatch -->
+  <rect x="620" y="400" width="230" height="84" class="box" fill="#f0fdf4" stroke="#16a34a"/>
+  <text x="735" y="428" text-anchor="middle" class="t">Amazon CloudWatch Logs</text>
+  <text x="735" y="448" text-anchor="middle" class="x">/aws/lambda/brailliant-parts-api</text>
+  <text x="735" y="466" text-anchor="middle" class="x">retention 7 days</text>
+
+  <!-- Data flow arrows -->
+  <line x1="220" y1="210" x2="296" y2="210" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="224" y="200" class="lbl">① HTTPS</text>
+  <line x1="296" y1="250" x2="224" y2="250" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="228" y="268" class="lbl">⑥ JSON</text>
+
+  <line x1="550" y1="210" x2="616" y2="210" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="553" y="200" class="lbl">② invoke</text>
+  <line x1="616" y1="250" x2="554" y2="250" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="556" y="268" class="lbl">⑤ resp</text>
+
+  <line x1="850" y1="210" x2="916" y2="210" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="853" y="200" class="lbl">③ SDK</text>
+  <line x1="916" y1="250" x2="854" y2="250" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="856" y="268" class="lbl">④ item</text>
+
+  <line x1="735" y1="340" x2="735" y2="396" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="745" y="374" class="lblg">logs (print / errors)</text>
+
+  <!-- IAM / security callouts -->
+  <rect x="300" y="380" width="290" height="110" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="1.4"/>
+  <text x="314" y="402" class="lblr">IAM &amp; security</text>
+  <text x="314" y="420" class="x">• Resource policy on Lambda: only apigateway</text>
+  <text x="314" y="435" class="x">   .amazonaws.com, source-arn = this API/*/*</text>
+  <text x="314" y="452" class="x">• LabRole (pre-made; Learner Lab can't create</text>
+  <text x="314" y="467" class="x">   roles). Needs only dynamodb:*Item, Scan, Describe</text>
+  <text x="314" y="482" class="x">• SigV4-signed SDK calls · TLS in transit</text>
+
+  <rect x="880" y="380" width="270" height="110" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="1.4"/>
+  <text x="894" y="402" class="lblr">Data protection</text>
+  <text x="894" y="420" class="x">• DynamoDB encryption at rest (AWS-owned</text>
+  <text x="894" y="435" class="x">   key, default) · no secrets in code</text>
+  <text x="894" y="452" class="x">• Input whitelist + type checks → 400</text>
+  <text x="894" y="467" class="x">• Conditional writes: 409 duplicate, 404 missing</text>
+  <text x="894" y="482" class="x">• API is public (no auth yet) — see brief §5</text>
+
+  <!-- Dashed IAM link from lambda role to dynamodb -->
+  <path d="M 790 318 C 860 330, 900 350, 960 340" fill="none" stroke="#b91c1c" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrR)"/>
+
+  <!-- Deployment path -->
+  <rect x="30" y="555" width="1140" height="140" rx="12" fill="#f9fafb" stroke="#9ca3af"/>
+  <text x="50" y="580" class="t">Provisioning path (control plane)</text>
+  <rect x="50" y="596" width="220" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
+  <text x="160" y="620" text-anchor="middle" class="lbl">Developer laptop / Lab terminal</text>
+  <text x="160" y="640" text-anchor="middle" class="x">Git repo · unit tests (fake table)</text>
+  <text x="160" y="656" text-anchor="middle" class="x">infra/deploy.sh · smoke_test.sh</text>
+  <text x="160" y="672" text-anchor="middle" class="x">teardown.sh</text>
+  <line x1="270" y1="637" x2="356" y2="637" stroke="#6b7280" stroke-width="1.6" marker-end="url(#arrG)"/>
+  <rect x="360" y="596" width="230" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
+  <text x="475" y="620" text-anchor="middle" class="lbl">AWS CLI v2</text>
+  <text x="475" y="640" text-anchor="middle" class="x">temporary STS credentials</text>
+  <text x="475" y="656" text-anchor="middle" class="x">(role voclabs, expire with session)</text>
+  <line x1="590" y1="637" x2="676" y2="637" stroke="#6b7280" stroke-width="1.6" marker-end="url(#arrG)"/>
+  <rect x="680" y="596" width="470" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
+  <text x="915" y="620" text-anchor="middle" class="lbl">Creates / updates, idempotent</text>
+  <text x="915" y="640" text-anchor="middle" class="x">dynamodb create-table → lambda create-function (zip, LabRole)</text>
+  <text x="915" y="656" text-anchor="middle" class="x">→ apigatewayv2 api + integration + 6 routes + $default stage</text>
+  <text x="915" y="672" text-anchor="middle" class="x">→ lambda add-permission → log retention · all tagged Project=brailliant-inventory</text>
+  <path d="M 915 596 L 915 520" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+</svg>
