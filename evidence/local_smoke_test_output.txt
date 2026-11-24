@@ -1,0 +1,55 @@
+BrAIlliant Parts Inventory - smoke test (LOCAL emulation: SAM CLI + DynamoDB Local)
+Date (UTC): 2026-11-24 14:51:08
+API: http://127.0.0.1:3000
+
+## 0. Connectivity: API Gateway -> Lambda -> DynamoDB
+$ curl -X GET http://127.0.0.1:3000/health 
+{"status": "ok", "table": "brailliant-parts", "tableStatus": "ACTIVE", "itemCount": 0, "time": "2026-11-24T14:51:09+00:00"}
+HTTP 200  (1.346914s)
+PASS (expected 200)
+
+## 1. CREATE
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"partId":"SMOKE-1795531868","section":"Carrier board","reference":"U2","description":"BQ25895RTWR charger (smoke test)","partNumber":"BQ25895RTWR","package":"WQFN-24 4x4","qtyPerDevice":1,"qtyInStock":3,"unitCostLow":1.06,"unitCostHigh":2.23,"location":"Drawer A1"}'
+{"section": "Carrier board", "reference": "U2", "description": "BQ25895RTWR charger (smoke test)", "partNumber": "BQ25895RTWR", "package": "WQFN-24 4x4", "qtyPerDevice": 1, "qtyInStock": 3, "unitCostLow": 1.06, "unitCostHigh": 2.23, "location": "Drawer A1", "partId": "SMOKE-1795531868", "createdAt": "2026-11-24T14:51:10+00:00", "updatedAt": "2026-11-24T14:51:10+00:00"}
+HTTP 201  (1.168179s)
+PASS (expected 201)
+
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"partId":"SMOKE-1795531868","description":"duplicate","qtyInStock":1}'
+{"error": "Part 'SMOKE-1795531868' already exists"}
+HTTP 409  (1.074844s)
+PASS (expected 409)
+
+$ curl -X POST http://127.0.0.1:3000/parts -d '{"description":"missing qty"}'
+{"error": "Missing required field(s): qtyInStock"}
+HTTP 400  (1.045881s)
+PASS (expected 400)
+
+## 2. READ
+$ curl -X GET http://127.0.0.1:3000/parts/SMOKE-1795531868 
+{"package": "WQFN-24 4x4", "qtyInStock": 3, "partId": "SMOKE-1795531868", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger (smoke test)", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T14:51:10+00:00", "partNumber": "BQ25895RTWR", "location": "Drawer A1", "updatedAt": "2026-11-24T14:51:10+00:00"}
+HTTP 200  (1.105542s)
+PASS (expected 200)
+
+$ curl -X GET http://127.0.0.1:3000/parts?section=Carrier%20board 
+{"count": 1, "items": [{"package": "WQFN-24 4x4", "qtyInStock": 3, "partId": "SMOKE-1795531868", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger (smoke test)", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T14:51:10+00:00", "partNumber": "BQ25895RTWR", "location": "Drawer A1", "updatedAt": "2026-11-24T14:51:10+00:00"}]}
+HTTP 200  (1.097219s)
+PASS (expected 200)
+
+## 3. UPDATE
+$ curl -X PUT http://127.0.0.1:3000/parts/SMOKE-1795531868 -d '{"qtyInStock":10,"location":"Drawer B2"}'
+{"package": "WQFN-24 4x4", "qtyInStock": 10, "partId": "SMOKE-1795531868", "unitCostLow": 1.06, "unitCostHigh": 2.23, "description": "BQ25895RTWR charger (smoke test)", "section": "Carrier board", "qtyPerDevice": 1, "reference": "U2", "createdAt": "2026-11-24T14:51:10+00:00", "location": "Drawer B2", "partNumber": "BQ25895RTWR", "updatedAt": "2026-11-24T14:51:16+00:00"}
+HTTP 200  (1.063840s)
+PASS (expected 200)
+
+## 4. DELETE
+$ curl -X DELETE http://127.0.0.1:3000/parts/SMOKE-1795531868 
+{"deleted": "SMOKE-1795531868"}
+HTTP 200  (1.071686s)
+PASS (expected 200)
+
+$ curl -X GET http://127.0.0.1:3000/parts/SMOKE-1795531868 
+{"error": "Part 'SMOKE-1795531868' not found"}
+HTTP 404  (1.070047s)
+PASS (expected 404)
+
+Result: 0 failure(s)

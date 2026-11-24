@@ -23,6 +23,8 @@ from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "brailliant-parts")
+# Set only for local emulation (SAM CLI + DynamoDB Local); empty on AWS.
+DYNAMODB_ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT", "")
 
 # Field name -> type. Only these fields are accepted from clients.
 FIELDS = {
@@ -46,7 +48,15 @@ def table():
     """Lazily create the table resource so unit tests can swap it out."""
     global _table
     if _table is None:
-        _table = boto3.resource("dynamodb").Table(TABLE_NAME)
+        if DYNAMODB_ENDPOINT:
+            # DynamoDB Local accepts any credentials.
+            resource = boto3.resource(
+                "dynamodb", endpoint_url=DYNAMODB_ENDPOINT,
+                region_name=os.environ.get("AWS_REGION", "us-east-1"),
+                aws_access_key_id="local", aws_secret_access_key="local")
+        else:
+            resource = boto3.resource("dynamodb")
+        _table = resource.Table(TABLE_NAME)
     return _table
 
 

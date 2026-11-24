@@ -6,7 +6,8 @@ source "$(dirname "$0")/config.sh"
 
 API_URL="${1:-$(cat "$STATE_FILE" 2>/dev/null)}"
 [[ -z "$API_URL" ]] && { echo "No API URL. Run infra/deploy.sh first or pass the URL."; exit 1; }
-OUT="$ROOT/evidence/smoke_test_output.txt"
+OUT="${OUT:-$ROOT/evidence/smoke_test_output.txt}"
+TARGET="${TARGET:-AWS}"
 mkdir -p "$ROOT/evidence"
 ID="SMOKE-$(date +%s)"
 FAILS=0
@@ -24,10 +25,10 @@ req() {  # req <expected-status> <method> <path> [json-body]
 }
 
 {
-  echo "BrAIlliant Parts Inventory - smoke test"
+  echo "BrAIlliant Parts Inventory - smoke test ($TARGET)"
   echo "Date (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
   echo "API: $API_URL"
-  echo "Caller: $(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo 'n/a')"
+  [[ "$TARGET" == AWS ]] && echo "Caller: $(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo 'n/a')"
   echo
 
   echo "## 0. Connectivity: API Gateway -> Lambda -> DynamoDB"

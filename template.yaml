@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  BrAIlliant Parts Inventory API (Track C, serverless).
+  API Gateway HTTP API -> Lambda (Python 3.13) -> DynamoDB.
+  Same stack as infra/deploy.sh, written as infrastructure as code.
+  Local:  bash local/start.sh       (SAM CLI + DynamoDB Local in Docker)
+  AWS:    sam build && sam deploy --guided
+
+Parameters:
+  Architecture:
+    Type: String
+    Default: arm64
+    AllowedValues: [arm64, x86_64]
+    Description: arm64 on AWS (cheaper); local/start.sh overrides it to x86_64 for the PC.
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  PartsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: brailliant-parts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: partId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: partId, KeyType: HASH }
+      Tags:
+        - { Key: Project, Value: brailliant-inventory }
+
+  PartsApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, PUT, DELETE]
+        AllowHeaders: [content-type]
+      Tags:
+        Project: brailliant-inventory
+
+  PartsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: brailliant-parts-api
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Architectures: [!Ref Architecture]
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref PartsTable
+          DYNAMODB_ENDPOINT: ""   # local/env.json points this at DynamoDB Local
+      # Least privilege: only these actions, only on this table.
+      # (SAM adds CloudWatch Logs write permission to the generated role.)
+      Policies:
+        - Statement:
+            - Sid: PartsTableCrud
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Scan
+                - dynamodb:DescribeTable
+              Resource: !GetAtt PartsTable.Arn
+      Events:
+        CreatePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: POST,   Path: /parts } }
+        ListParts:  { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: /parts } }
+        GetPart:    { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: "/parts/{partId}" } }
+        UpdatePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: PUT,    Path: "/parts/{partId}" } }
+        DeletePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: DELETE, Path: "/parts/{partId}" } }
+        Health:     { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: /health } }
+      Tags:
+        Project: brailliant-inventory
+
+  PartsFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${PartsFunction}
+      RetentionInDays: 7
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the HTTP API
+    Value: !Sub https://${PartsApi}.execute-api.${AWS::Region}.amazonaws.com
+  TableName:
+    Value: !Ref PartsTable
+  FunctionArn:
+    Value: !GetAtt PartsFunction.Arn

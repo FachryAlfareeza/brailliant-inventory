@@ -1,5 +1,23 @@
 # AWS evidence (Week 12)
 
+## A. Local emulation evidence (use this while AWS access is blocked)
+
+Label these clearly as **local emulation (SAM CLI + DynamoDB Local)** in the submission.
+
+| File | What to capture |
+|---|---|
+| `L1_docker_containers.png` | Docker Desktop → Containers: `kompaw-dynamodb` and the SAM Lambda container running |
+| `L2_sam_start.png` | terminal 1 after `bash local/start.sh`: `sam validate --lint` OK, `Build Succeeded`, and the mounted routes `/parts`, `/parts/{partId}`, `/health` |
+| `L3_smoke_test.png` | terminal 2: `infra/smoke_test.sh http://127.0.0.1:3000` ending `Result: 0 failure(s)` |
+| `L4_seed_and_count.png` | `python infra/seed.py http://127.0.0.1:3000` (201: 98) and the DynamoDB Local scan count (98) |
+| `L5_browser_get.png` | browser at `http://127.0.0.1:3000/parts/BOM-005` showing the JSON item |
+| `L6_lambda_logs.png` | terminal 1 scrolled to the `START RequestId … END … REPORT` invocation logs |
+| `L7_aws_block_notice.png` | the AWS email or page saying the account is blocked (hide personal details) |
+
+`local_smoke_test_output.txt` is written automatically.
+
+## B. Real AWS evidence (once access is restored)
+
 Put the screenshots in this folder using these file names. Each one should show the account/region bar and the clock where possible.
 
 | File | What to capture |

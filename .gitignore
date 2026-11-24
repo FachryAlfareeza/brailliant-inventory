@@ -7,3 +7,5 @@ docs/_brief_render.html
 *.pem
 .env
 submission/
+.venv-sam/
+.aws-sam/

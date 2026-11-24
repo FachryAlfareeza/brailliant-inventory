@@ -9,7 +9,8 @@ AAKRUTI / IDC 2026 entry). The prototype's real bill of materials (98 lines, Rev
 | 1. Architecture diagram | [docs/architecture.svg](docs/architecture.svg) / [.png](docs/architecture.png) |
 | 2. Design brief (2 pages) | [docs/design_brief.pdf](docs/design_brief.pdf) (source: [design_brief.html](docs/design_brief.html)) |
 | 3. Git repo: README, starter code, deployment plan | this repo, [src/app.py](src/app.py), [docs/deployment_plan.md](docs/deployment_plan.md) |
-| 4. AWS evidence | [evidence/](evidence/README.md) (screenshots and `smoke_test_output.txt`) |
+| 4. AWS evidence | [evidence/](evidence/README.md). AWS access is currently blocked, so this is **local emulation** evidence (`local_smoke_test_output.txt`) |
+| Infrastructure as code | [template.yaml](template.yaml) (AWS SAM): the same stack, deployable with `sam deploy` |
 
 ## Architecture
 
@@ -45,10 +46,33 @@ infra/deploy.sh       idempotent provisioning with the AWS CLI
 infra/smoke_test.sh   connectivity + CRUD test, writes evidence/smoke_test_output.txt
 infra/seed.py         loads data/parts_seed.json (98 BOM parts) through the API
 infra/teardown.sh     deletes everything deploy.sh created
+template.yaml         the same stack as AWS SAM infrastructure as code
+local/                start.sh / stop.sh / env.json for local emulation
 data/parts_seed.json  BrAIlliant BOM Rev. F exported to JSON
 docs/                 diagram, design brief, deployment plan, PDF build script
 evidence/             AWS screenshots and test outputs
 ```
+
+## Local emulation (no AWS account needed)
+
+Status, 24 Nov 2026: both of my AWS accounts are blocked, so the stack is verified locally with AWS's own tools.
+- `sam local start-api` runs `template.yaml`: API routes, then the Lambda handler in the official `public.ecr.aws/lambda/python:3.13` image.
+- **DynamoDB Local** (`amazon/dynamodb-local`) runs in Docker on the same network.
+
+Result: `/health` and the CRUD smoke test pass 9/9, and all 98 BOM parts load (see `evidence/local_smoke_test_output.txt`).
+
+Requirements: Docker Desktop running, AWS CLI v2, and SAM CLI. Without admin rights you can install SAM CLI into a venv:
+`python -m venv .venv-sam && .venv-sam/Scripts/python -m pip install aws-sam-cli`.
+
+```bash
+bash local/start.sh                 # terminal 1: DynamoDB Local + sam validate/build + API on http://127.0.0.1:3000
+TARGET="LOCAL emulation" OUT="$PWD/evidence/local_smoke_test_output.txt"   bash infra/smoke_test.sh http://127.0.0.1:3000   # terminal 2
+python infra/seed.py http://127.0.0.1:3000          # load the 98 parts
+bash local/stop.sh                  # remove the DynamoDB Local container (data is in-memory)
+```
+DynamoDB Local listens on host port 8010 (`DB_PORT=...` to change). `local/env.json` points the function at it.
+
+Once AWS access works, deploy the same template with `sam build && sam deploy --guided`, or use `infra/deploy.sh`.
 
 ## Quick start
 

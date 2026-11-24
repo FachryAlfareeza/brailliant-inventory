@@ -111,10 +111,14 @@ Create, update and delete use DynamoDB <i>conditional writes</i>, so a duplicate
 <h2>6. Environment &amp; plan</h2>
 <ul>
   <li><b>Repo:</b> <code>src/app.py</code> (handler), <code>tests/</code> (6 unit tests on a fake table, no AWS needed),
-      <code>infra/deploy.sh</code> (idempotent AWS CLI provisioning), <code>smoke_test.sh</code>, <code>seed.py</code>,
+      <code>template.yaml</code> (SAM), <code>infra/deploy.sh</code> (idempotent AWS CLI provisioning), <code>local/</code> (emulation), <code>smoke_test.sh</code>, <code>seed.py</code>,
       <code>teardown.sh</code>, and <code>docs/</code>.</li>
-  <li><b>Week 12 (this):</b> design, repo, provision the table, function and API, and test connectivity through <code>/health</code> and a full CRUD smoke test.</li>
-  <li><b>Next:</b> load the 98 BOM parts, add authentication, a "missing for N devices" report endpoint,
+  <li><b>Week 12 (this):</b> design, repo, and infrastructure as code (<code>template.yaml</code>, AWS SAM, plus the CLI scripts).
+      <b>Status:</b> both my AWS accounts are currently blocked, so the stack was verified in
+      <b>local emulation</b>: SAM CLI <code>sam local start-api</code> with the official Lambda Python 3.13 image and
+      DynamoDB Local in Docker. <code>/health</code> and the CRUD smoke test pass (9/9), and all 98 BOM parts load.
+      Cloud deployment is <code>sam deploy</code> once access returns.</li>
+  <li><b>Next:</b> deploy to AWS with <code>sam deploy</code>, add authentication, a "missing for N devices" report endpoint,
       CloudWatch alarms on 5xx, and a CI workflow that runs the tests.</li>
   <li><b>Cost:</b> test traffic is a few hundred requests and 98 items, which is far below the Lambda and DynamoDB free allowances.
       Expected spend is under $0.01. Idle cost is $0 apart from a few KB of storage. The $1 budget alert catches mistakes.
