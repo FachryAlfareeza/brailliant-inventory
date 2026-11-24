@@ -48,14 +48,16 @@
   <b>Track C: Amazon API Gateway (HTTP API) + AWS Lambda + Amazon DynamoDB.</b>
 </p>
 <ul>
-  <li><b>Budget.</b> Learner Lab credit cannot be reset. All three services are billed per request and cost nothing while idle.
-    Track A (EC2 + RDS) or Track B (EC2 + Docker) would bill per hour unless the instances are stopped every session.</li>
+  <li><b>Budget.</b> I have no AWS Academy Learner Lab seat, so this runs on my <b>personal AWS account</b>, which bills real money.
+    All three services are billed per request and cost nothing while idle.
+    Track A (EC2 + RDS) or Track B (EC2 + Docker) would bill per hour unless the instances are stopped every time.</li>
   <li><b>Fit.</b> Inventory traffic is small and bursty (a few people before a build), so serverless suits it.
     One entity with key-based access maps directly onto a DynamoDB table with partition key <code>partId</code>.</li>
-  <li><b>Learner Lab limits.</b> No custom IAM roles can be created, so the function uses the pre-made <code>LabRole</code>.
-    Everything runs in <code>us-east-1</code>, with no VPC, NAT gateway or other hourly-billed network parts.</li>
+  <li><b>Account setup.</b> Deployment uses an IAM user's access key, never the root user. The script creates
+    the function's own least-privilege role. Everything runs in <code>us-east-1</code>, with no VPC, NAT gateway or other
+    hourly-billed network parts. The same scripts also run unchanged on Learner Lab (they detect it and use <code>LabRole</code>).</li>
   <li><b>Spend guards.</b> On-demand capacity, stage throttling of 10 req/s (burst 20), 128 MB arm64 Lambda,
-    7-day log retention, a <code>Project</code> tag on every resource, and a <code>teardown.sh</code> script.</li>
+    7-day log retention, an AWS Budgets email alert at $1/month, a <code>Project</code> tag on every resource, and a <code>teardown.sh</code> script.</li>
 </ul>
 
 <h2>3. Data entity — <code>Part</code> (table <code>brailliant-parts</code>)</h2>
@@ -87,7 +89,7 @@ Create, update and delete use DynamoDB <i>conditional writes</i>, so a duplicate
 <h2>5. Architecture: request/data flow, IAM and network</h2>
 <div class="fig"><img src="architecture.png" alt="Architecture diagram"></div>
 <div class="cap">Figure 1. ① The client calls the HTTPS endpoint. ② API Gateway invokes Lambda (AWS_PROXY, payload 2.0).
-③ Lambda calls DynamoDB through the SDK, signed with LabRole credentials. ④–⑥ The item or result returns to the client as JSON. Logs go to CloudWatch.</div>
+③ Lambda calls DynamoDB through the SDK, signed with the credentials of the function's execution role. ④–⑥ The item or result returns to the client as JSON. Logs go to CloudWatch.</div>
 
 <div class="two">
 <div>
@@ -95,13 +97,14 @@ Create, update and delete use DynamoDB <i>conditional writes</i>, so a duplicate
 <ul>
   <li><b>Invoke:</b> a Lambda resource policy lets only <code>apigateway.amazonaws.com</code> with
       <code>source-arn = arn:aws:execute-api:…:{api-id}/*/*</code> invoke the function.</li>
-  <li><b>Data access:</b> the Lambda execution role is <code>LabRole</code>. It is broader than needed.
-      The least-privilege policy for production is <code>dynamodb:PutItem, GetItem, UpdateItem,
-      DeleteItem, Scan, DescribeTable</code> on the table ARN only, plus CloudWatch Logs write.</li>
+  <li><b>Data access:</b> the execution role <code>brailliant-parts-lambda-role</code> can be assumed only by Lambda in this account.
+      Its inline policy allows only <code>dynamodb:PutItem, GetItem, UpdateItem, DeleteItem, Scan, DescribeTable</code>
+      on this table's ARN, plus writing to its own log group.</li>
+  <li><b>Operator:</b> an IAM user with an access key deploys the stack. The script refuses to run as root, and the root user is kept for billing only, with MFA enabled.</li>
   <li><b>Network:</b> fully managed and public. TLS is used in transit, and SigV4 signs the Lambda→DynamoDB calls.
       DynamoDB is encrypted at rest by default. No secrets are stored in the code or the repo.</li>
   <li><b>Known gap:</b> the API has no client authentication yet. Planned: an API Gateway JWT authorizer
-      (Cognito, if Learner Lab allows it [to verify]) or at least a short-lived lab-only URL.</li>
+      backed by an Amazon Cognito user pool, or an API key with a usage plan as a simpler step.</li>
 </ul>
 </div>
 <div>
@@ -113,8 +116,9 @@ Create, update and delete use DynamoDB <i>conditional writes</i>, so a duplicate
   <li><b>Week 12 (this):</b> design, repo, provision the table, function and API, and test connectivity through <code>/health</code> and a full CRUD smoke test.</li>
   <li><b>Next:</b> load the 98 BOM parts, add authentication, a "missing for N devices" report endpoint,
       CloudWatch alarms on 5xx, and a CI workflow that runs the tests.</li>
-  <li><b>Cost:</b> test traffic is a few hundred requests, which falls inside free-tier-sized amounts. Idle cost is $0 apart from
-      a few KB of storage. Run <code>teardown.sh</code> after grading.</li>
+  <li><b>Cost:</b> test traffic is a few hundred requests and 98 items, which is far below the Lambda and DynamoDB free allowances.
+      Expected spend is under $0.01. Idle cost is $0 apart from a few KB of storage. The $1 budget alert catches mistakes.
+      Run <code>teardown.sh</code> after grading.</li>
 </ul>
 </div>
 </div>

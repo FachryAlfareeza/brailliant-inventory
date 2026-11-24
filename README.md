@@ -17,7 +17,7 @@ AAKRUTI / IDC 2026 entry). The prototype's real bill of materials (98 lines, Rev
 
 ```
 Client --HTTPS--> API Gateway HTTP API ($default, throttled)
-                    --AWS_PROXY v2.0--> Lambda brailliant-parts-api (Python 3.13, LabRole)
+                    --AWS_PROXY v2.0--> Lambda brailliant-parts-api (Python 3.13, own least-privilege role)
                                           --SDK (SigV4)--> DynamoDB brailliant-parts (PK partId, on-demand)
                                           --logs--> CloudWatch Logs (7-day retention)
 ```
@@ -40,11 +40,11 @@ Client --HTTPS--> API Gateway HTTP API ($default, throttled)
 ```
 src/app.py            Lambda handler (routing, validation, DynamoDB CRUD)
 tests/test_app.py     6 unit tests with an in-memory fake table (no AWS needed)
-infra/config.sh       names, region, LabRole
+infra/config.sh       names, region, role and budget settings
 infra/deploy.sh       idempotent provisioning with the AWS CLI
 infra/smoke_test.sh   connectivity + CRUD test, writes evidence/smoke_test_output.txt
 infra/seed.py         loads data/parts_seed.json (98 BOM parts) through the API
-infra/teardown.sh     deletes everything (protects the Learner Lab budget)
+infra/teardown.sh     deletes everything deploy.sh created
 data/parts_seed.json  BrAIlliant BOM Rev. F exported to JSON
 docs/                 diagram, design brief, deployment plan, PDF build script
 evidence/             AWS screenshots and test outputs
@@ -52,33 +52,50 @@ evidence/             AWS screenshots and test outputs
 
 ## Quick start
 
+### 0. One-time AWS account setup (personal account)
+1. Sign up at aws.amazon.com and **turn on MFA for the root user** (account menu → Security credentials).
+2. IAM console → Users → **Create user** (e.g. `kompaw-dev`) → *Attach policies directly* → `AdministratorAccess`.
+   Use this user, not root, for everything below. Delete it after grading.
+3. Open that user → Security credentials → **Create access key** → *Command Line Interface (CLI)*.
+4. On your PC run `aws configure` and enter the key, the secret, region `us-east-1` and output `json`.
+   Check it with `aws sts get-caller-identity`. The ARN must end in `:user/kompaw-dev`, not `:root`.
+   Never commit the key. It lives only in `~/.aws/credentials`.
+
+### 1. Test locally (Python 3.10+ with boto3)
 ```bash
-# 1. Local tests (Python 3.10+ with boto3)
 python -m unittest discover -s tests -v
-
-# 2. AWS Learner Lab: Start Lab -> wait for the green dot.
-#    Either open the lab's terminal and clone this repo there, or copy
-#    "AWS Details -> AWS CLI" into ~/.aws/credentials on your own machine.
-bash infra/deploy.sh          # creates the table, function, API and routes; prints the API URL
-bash infra/smoke_test.sh      # health + CRUD, saved to evidence/smoke_test_output.txt
-python infra/seed.py          # optional: load the 98 BOM parts
-
-# 3. When finished (after grading)
-bash infra/teardown.sh
 ```
+
+### 2. Deploy and test (Git Bash on Windows, or any bash)
+```bash
+BUDGET_EMAIL=you@example.com bash infra/deploy.sh   # role, table, function, API, $1/month budget alert
+bash infra/smoke_test.sh                            # health + CRUD, saved to evidence/smoke_test_output.txt
+python infra/seed.py                                # optional: load the 98 BOM parts
+```
+AWS emails you once to confirm the budget alert. Accept it.
+
+### 3. When finished (after grading)
+```bash
+bash infra/teardown.sh      # deletes the API, function, logs, table and role
+```
+Then delete the `kompaw-dev` user's access key (or the whole user) in IAM.
+
+The same scripts also run on **AWS Academy Learner Lab**. They detect the `voclabs` role, use the pre-made
+`LabRole` instead of creating one, and skip the budget.
 
 Example call:
 
 ```bash
 URL=$(cat infra/.api_url)
-curl -X POST "$URL/parts" -H 'Content-Type: application/json' \
-  -d '{"partId":"BOM-005","description":"BQ25895RTWR charger","qtyInStock":3,"section":"Carrier board"}'
+curl -X POST "$URL/parts" -H 'Content-Type: application/json'   -d '{"partId":"BOM-005","description":"BQ25895RTWR charger","qtyInStock":3,"section":"Carrier board"}'
 curl "$URL/parts/BOM-005"
 ```
 
 ## Budget notes
 
-All services are pay-per-request, so idle cost is about $0. There is no EC2, RDS, NAT gateway or VPC endpoint.
-The stage is throttled to 10 req/s (burst 20). Lambda uses 128 MB on arm64, logs are kept 7 days,
-and every resource is tagged `Project=brailliant-inventory`. Learner Lab sessions end after about 4 h,
-but serverless resources persist without spending.
+This runs on a personal account, so it costs real money, but the design keeps the expected spend under $0.01.
+- Every service is pay-per-request, so idle cost is about $0. There is no EC2, RDS, NAT gateway or VPC endpoint.
+- The stage is throttled to 10 req/s (burst 20), so a leaked URL can't run up a large bill.
+- Lambda uses 128 MB on arm64, and logs are kept 7 days.
+- An AWS Budgets alert emails you at 80% of $1 (actual) and 100% (forecast).
+- Every resource is tagged `Project=brailliant-inventory`, and `teardown.sh` removes all of it.

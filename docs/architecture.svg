@@ -22,7 +22,7 @@
 
   <rect width="1200" height="720" fill="#ffffff"/>
   <text x="30" y="38" font-size="22" font-weight="700" fill="#111827">BrAIlliant Parts Inventory — Track C (Serverless) architecture</text>
-  <text x="30" y="60" class="s">Entity: Part (partId) · 4 CRUD operations + health check · AWS Learner Lab, us-east-1 · no VPC, no servers, pay-per-request</text>
+  <text x="30" y="60" class="s">Entity: Part (partId) · 4 CRUD operations + health check · personal AWS account, us-east-1 · no VPC, no servers, pay-per-request</text>
 
   <!-- Clients -->
   <rect x="30" y="150" width="190" height="150" class="box" fill="#f3f4f6" stroke="#6b7280"/>
@@ -35,7 +35,7 @@
 
   <!-- AWS cloud boundary -->
   <rect x="270" y="90" width="900" height="420" rx="14" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="8 5"/>
-  <text x="290" y="114" font-size="14" font-weight="700" fill="#b45309">AWS Cloud · Region us-east-1 (Learner Lab account)</text>
+  <text x="290" y="114" font-size="14" font-weight="700" fill="#b45309">AWS Cloud · Region us-east-1 (personal account, IAM user)</text>
 
   <!-- API Gateway -->
   <rect x="300" y="140" width="250" height="200" class="box" fill="#f5f3ff" stroke="#7c3aed"/>
@@ -59,7 +59,7 @@
   <text x="735" y="246" text-anchor="middle" class="x">routes by routeKey, validates</text>
   <text x="735" y="262" text-anchor="middle" class="x">body, returns JSON + status</text>
   <text x="735" y="288" text-anchor="middle" class="x">env TABLE_NAME=brailliant-parts</text>
-  <text x="735" y="318" text-anchor="middle" class="lblr">execution role: LabRole</text>
+  <text x="735" y="318" text-anchor="middle" class="lblr">role: brailliant-parts-lambda-role</text>
 
   <!-- DynamoDB -->
   <rect x="920" y="140" width="230" height="200" class="box" fill="#eff6ff" stroke="#2563eb"/>
@@ -103,8 +103,8 @@
   <text x="314" y="402" class="lblr">IAM &amp; security</text>
   <text x="314" y="420" class="x">• Resource policy on Lambda: only apigateway</text>
   <text x="314" y="435" class="x">   .amazonaws.com, source-arn = this API/*/*</text>
-  <text x="314" y="452" class="x">• LabRole (pre-made; Learner Lab can't create</text>
-  <text x="314" y="467" class="x">   roles). Needs only dynamodb:*Item, Scan, Describe</text>
+  <text x="314" y="452" class="x">• Own execution role, least privilege: only</text>
+  <text x="314" y="467" class="x">   dynamodb *Item, Scan, Describe on this table + own logs</text>
   <text x="314" y="482" class="x">• SigV4-signed SDK calls · TLS in transit</text>
 
   <rect x="880" y="380" width="270" height="110" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="1.4"/>
@@ -122,20 +122,20 @@
   <rect x="30" y="555" width="1140" height="140" rx="12" fill="#f9fafb" stroke="#9ca3af"/>
   <text x="50" y="580" class="t">Provisioning path (control plane)</text>
   <rect x="50" y="596" width="220" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
-  <text x="160" y="620" text-anchor="middle" class="lbl">Developer laptop / Lab terminal</text>
+  <text x="160" y="620" text-anchor="middle" class="lbl">Developer laptop (Git Bash)</text>
   <text x="160" y="640" text-anchor="middle" class="x">Git repo · unit tests (fake table)</text>
   <text x="160" y="656" text-anchor="middle" class="x">infra/deploy.sh · smoke_test.sh</text>
   <text x="160" y="672" text-anchor="middle" class="x">teardown.sh</text>
   <line x1="270" y1="637" x2="356" y2="637" stroke="#6b7280" stroke-width="1.6" marker-end="url(#arrG)"/>
   <rect x="360" y="596" width="230" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
   <text x="475" y="620" text-anchor="middle" class="lbl">AWS CLI v2</text>
-  <text x="475" y="640" text-anchor="middle" class="x">temporary STS credentials</text>
-  <text x="475" y="656" text-anchor="middle" class="x">(role voclabs, expire with session)</text>
+  <text x="475" y="640" text-anchor="middle" class="x">IAM user access key (not root)</text>
+  <text x="475" y="656" text-anchor="middle" class="x">$1/month AWS Budgets email alert</text>
   <line x1="590" y1="637" x2="676" y2="637" stroke="#6b7280" stroke-width="1.6" marker-end="url(#arrG)"/>
   <rect x="680" y="596" width="470" height="82" rx="8" fill="#ffffff" stroke="#6b7280"/>
   <text x="915" y="620" text-anchor="middle" class="lbl">Creates / updates, idempotent</text>
-  <text x="915" y="640" text-anchor="middle" class="x">dynamodb create-table → lambda create-function (zip, LabRole)</text>
+  <text x="915" y="640" text-anchor="middle" class="x">iam create-role + policy → dynamodb create-table → lambda create-function (zip)</text>
   <text x="915" y="656" text-anchor="middle" class="x">→ apigatewayv2 api + integration + 6 routes + $default stage</text>
-  <text x="915" y="672" text-anchor="middle" class="x">→ lambda add-permission → log retention · all tagged Project=brailliant-inventory</text>
+  <text x="915" y="672" text-anchor="middle" class="x">→ add-permission → log retention → budget · tagged Project=brailliant-inventory</text>
   <path d="M 915 596 L 915 520" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
 </svg>
