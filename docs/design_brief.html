@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design Brief — BrAIlliant Parts Inventory (Week 12)</title>
+<style>
+  @page { size: A4; margin: 15mm 16mm 14mm 16mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.6pt; line-height: 1.32; color: #111827; margin: 0; }
+  h1 { font-size: 16.5pt; margin: 0 0 2px; }
+  .meta { color: #4b5563; font-size: 9pt; margin-bottom: 8px; border-bottom: 2px solid #0d9488; padding-bottom: 6px; }
+  h2 { font-size: 11pt; color: #0f766e; margin: 9px 0 3px; }
+  p { margin: 3px 0 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin: 4px 0 6px; }
+  th, td { border: 1px solid #d1d5db; padding: 3px 6px; text-align: left; vertical-align: top; }
+  th { background: #f0fdfa; }
+  code { font-family: Consolas, monospace; font-size: 8.6pt; background: #f3f4f6; padding: 0 2px; border-radius: 2px; }
+  ul { margin: 3px 0 5px 18px; padding: 0; }
+  li { margin: 1px 0; }
+  .fig { text-align: center; margin: 6px 0 2px; }
+  .fig img { width: 100%; border: 1px solid #e5e7eb; }
+  .cap { font-size: 8.5pt; color: #4b5563; text-align: center; }
+  .two { display: flex; gap: 14px; } .two > div { flex: 1; }
+  .pb { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>BrAIlliant Parts Inventory API — Design Brief</h1>
+<div class="meta">
+  AWS Cloud Computing · Individual Project · Week 12 (Design &amp; AWS Setup) ·
+  <b>Track C — Serverless</b> · Name: <b>{{NAME}}</b> · NIU: <b>{{NIU}}</b> · {{DATE}}
+</div>
+
+<h2>1. Use case</h2>
+<p>
+  <b>Inventory</b> of components for <i>BrAIlliant</i>, a low-cost multiline refreshable braille display with AI
+  that I am developing for the SOLIDWORKS AAKRUTI Global / IDC 2026 competition. One prototype needs
+  98 bill-of-materials (BOM) lines across nine sections (carrier board, display PCB, actuators,
+  modules, mechanical parts and so on). The team currently keeps them in a spreadsheet, so nobody knows
+  what is in stock, where it is stored, or what is still missing before a build.
+  The service gives the team one shared HTTP API to <b>record, look up, update and remove parts</b>:
+  how many each device needs, how many are in stock, where they are stored, and the estimated unit cost.
+  The real BOM (Rev. F) is exported to <code>data/parts_seed.json</code> and loaded through the API.
+</p>
+
+<h2>2. Chosen track and why</h2>
+<p>
+  <b>Track C: Amazon API Gateway (HTTP API) + AWS Lambda + Amazon DynamoDB.</b>
+</p>
+<ul>
+  <li><b>Budget.</b> Learner Lab credit cannot be reset. All three services are billed per request and cost nothing while idle.
+    Track A (EC2 + RDS) or Track B (EC2 + Docker) would bill per hour unless the instances are stopped every session.</li>
+  <li><b>Fit.</b> Inventory traffic is small and bursty (a few people before a build), so serverless suits it.
+    One entity with key-based access maps directly onto a DynamoDB table with partition key <code>partId</code>.</li>
+  <li><b>Learner Lab limits.</b> No custom IAM roles can be created, so the function uses the pre-made <code>LabRole</code>.
+    Everything runs in <code>us-east-1</code>, with no VPC, NAT gateway or other hourly-billed network parts.</li>
+  <li><b>Spend guards.</b> On-demand capacity, stage throttling of 10 req/s (burst 20), 128 MB arm64 Lambda,
+    7-day log retention, a <code>Project</code> tag on every resource, and a <code>teardown.sh</code> script.</li>
+</ul>
+
+<h2>3. Data entity — <code>Part</code> (table <code>brailliant-parts</code>)</h2>
+<table>
+  <tr><th>Attribute</th><th>Type</th><th>Rule</th><th>Example</th></tr>
+  <tr><td><code>partId</code></td><td>String (PK)</td><td>Unique. Given by the client or generated as <code>P-xxxxxxxx</code></td><td><code>BOM-005</code></td></tr>
+  <tr><td><code>description</code></td><td>String</td><td>Required, not empty</td><td>BQ25895RTWR charger</td></tr>
+  <tr><td><code>qtyInStock</code></td><td>Integer</td><td>Required, ≥ 0</td><td>3</td></tr>
+  <tr><td><code>qtyPerDevice</code></td><td>Integer</td><td>Optional, ≥ 0</td><td>1</td></tr>
+  <tr><td><code>section</code>, <code>reference</code></td><td>String</td><td>Optional. <code>section</code> is the list filter</td><td>Carrier board, U2</td></tr>
+  <tr><td><code>partNumber</code>, <code>package</code>, <code>location</code></td><td>String</td><td>Optional</td><td>BQ25895RTWR, WQFN-24, Drawer A1</td></tr>
+  <tr><td><code>unitCostLow</code>, <code>unitCostHigh</code></td><td>Number (USD)</td><td>Optional, ≥ 0</td><td>1.06, 2.23</td></tr>
+  <tr><td><code>createdAt</code>, <code>updatedAt</code></td><td>ISO-8601 string</td><td>Set by the server</td><td>2026-11-24T05:30:00+00:00</td></tr>
+</table>
+
+<h2>4. CRUD endpoints (base URL <code>https://{api-id}.execute-api.us-east-1.amazonaws.com</code>)</h2>
+<table>
+  <tr><th>Op</th><th>Method &amp; path</th><th>Request</th><th>Success</th><th>Errors</th></tr>
+  <tr><td>Create</td><td><code>POST /parts</code></td><td>JSON Part (<code>description</code>, <code>qtyInStock</code> required)</td><td>201 + item</td><td>400 invalid, 409 duplicate id</td></tr>
+  <tr><td>Read</td><td><code>GET /parts</code>, <code>GET /parts?section=…</code><br><code>GET /parts/{partId}</code></td><td>—</td><td>200 <code>{count, items}</code><br>200 + item</td><td>404 not found</td></tr>
+  <tr><td>Update</td><td><code>PUT /parts/{partId}</code></td><td>JSON with any fields to change</td><td>200 + updated item</td><td>400 invalid, 404</td></tr>
+  <tr><td>Delete</td><td><code>DELETE /parts/{partId}</code></td><td>—</td><td>200 <code>{deleted}</code></td><td>404</td></tr>
+  <tr><td>Health</td><td><code>GET /health</code></td><td>—</td><td>200 table status</td><td>500 if the table can't be reached</td></tr>
+</table>
+<p>Unknown fields, wrong types and negative numbers are rejected with 400.
+Create, update and delete use DynamoDB <i>conditional writes</i>, so a duplicate id returns 409 and a missing id returns 404 without a separate read.</p>
+
+
+<h2>5. Architecture: request/data flow, IAM and network</h2>
+<div class="fig"><img src="architecture.png" alt="Architecture diagram"></div>
+<div class="cap">Figure 1. ① The client calls the HTTPS endpoint. ② API Gateway invokes Lambda (AWS_PROXY, payload 2.0).
+③ Lambda calls DynamoDB through the SDK, signed with LabRole credentials. ④–⑥ The item or result returns to the client as JSON. Logs go to CloudWatch.</div>
+
+<div class="two">
+<div>
+<h2>IAM &amp; security</h2>
+<ul>
+  <li><b>Invoke:</b> a Lambda resource policy lets only <code>apigateway.amazonaws.com</code> with
+      <code>source-arn = arn:aws:execute-api:…:{api-id}/*/*</code> invoke the function.</li>
+  <li><b>Data access:</b> the Lambda execution role is <code>LabRole</code>. It is broader than needed.
+      The least-privilege policy for production is <code>dynamodb:PutItem, GetItem, UpdateItem,
+      DeleteItem, Scan, DescribeTable</code> on the table ARN only, plus CloudWatch Logs write.</li>
+  <li><b>Network:</b> fully managed and public. TLS is used in transit, and SigV4 signs the Lambda→DynamoDB calls.
+      DynamoDB is encrypted at rest by default. No secrets are stored in the code or the repo.</li>
+  <li><b>Known gap:</b> the API has no client authentication yet. Planned: an API Gateway JWT authorizer
+      (Cognito, if Learner Lab allows it [to verify]) or at least a short-lived lab-only URL.</li>
+</ul>
+</div>
+<div>
+<h2>6. Environment &amp; plan</h2>
+<ul>
+  <li><b>Repo:</b> <code>src/app.py</code> (handler), <code>tests/</code> (6 unit tests on a fake table, no AWS needed),
+      <code>infra/deploy.sh</code> (idempotent AWS CLI provisioning), <code>smoke_test.sh</code>, <code>seed.py</code>,
+      <code>teardown.sh</code>, and <code>docs/</code>.</li>
+  <li><b>Week 12 (this):</b> design, repo, provision the table, function and API, and test connectivity through <code>/health</code> and a full CRUD smoke test.</li>
+  <li><b>Next:</b> load the 98 BOM parts, add authentication, a "missing for N devices" report endpoint,
+      CloudWatch alarms on 5xx, and a CI workflow that runs the tests.</li>
+  <li><b>Cost:</b> test traffic is a few hundred requests, which falls inside free-tier-sized amounts. Idle cost is $0 apart from
+      a few KB of storage. Run <code>teardown.sh</code> after grading.</li>
+</ul>
+</div>
+</div>
+
+</body>
+</html>
