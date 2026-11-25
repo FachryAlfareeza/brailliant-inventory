@@ -1,6 +1,7 @@
 # Evidence
 
-All screenshots with captions are in **[evidence.pdf](evidence.pdf)** (rebuild with `python tools/build_evidence_pdf.py`).
+All screenshots with captions are in **[evidence.pdf](evidence.pdf)**, and in [evidence.docx](evidence.docx) if you want to edit it.
+Rebuild with `python tools/build_evidence_pdf.py`, then `node tools/make_docx.js` (needs `npm install docx`).
 
 These are from running the project locally (SAM CLI + DynamoDB Local), because my AWS accounts are suspended.
 

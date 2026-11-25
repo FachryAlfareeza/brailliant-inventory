@@ -26,9 +26,9 @@ tests/              unit tests, use a fake table so they run without AWS
 template.yaml       SAM template (table, function, role, API)
 scripts/            deploy / teardown with the AWS CLI, local run, API test, seeding
 data/parts.json     98 parts from the BrAIlliant BOM
-docs/               design brief, architecture diagram, deployment plan
+docs/               design brief (.docx and .pdf), architecture diagram, deployment plan
 evidence/           screenshots and test output
-tools/              scripts that build the PDFs and the submission zip
+tools/              scripts that build the PDFs, the Word files and the submission zip
 ```
 
 ## API
