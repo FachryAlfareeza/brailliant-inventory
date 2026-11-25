@@ -1,67 +1,77 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: BrAIlliant parts inventory API (API Gateway HTTP API + Lambda + DynamoDB)
+Description: BrAIlliant scan API (API Gateway HTTP API + Lambda + DynamoDB + Rekognition)
 
-# Same resources as scripts/deploy.sh, but as a SAM template.
 # Local test: bash scripts/local_start.sh
-# Deploy:     sam build && sam deploy --guided
+# Deploy:     bash scripts/deploy.sh   (builds the Pillow layer, then sam build + sam deploy)
 
 Parameters:
-  Architecture:
+  OcrEnabled:
     Type: String
-    Default: arm64
-    AllowedValues: [arm64, x86_64]
-    Description: arm64 on AWS, x86_64 when testing locally
+    Default: "true"
+    AllowedValues: ["true", "false"]
+  BudgetEmail:
+    Type: String
+    Default: ""
+    Description: email for the $1/month budget alert (leave empty to skip)
+
+Conditions:
+  HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, ""]]
 
 Globals:
   Function:
     Runtime: python3.13
-    Timeout: 10
-    MemorySize: 128
+    Architectures: [x86_64]
+    Timeout: 15
+    MemorySize: 512   # Pillow needs more than 128 MB for camera photos
 
 Resources:
-  PartsTable:
+  ScansTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: brailliant-parts
+      TableName: brailliant-scans
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - { AttributeName: partId, AttributeType: S }
+        - { AttributeName: scanId, AttributeType: S }
       KeySchema:
-        - { AttributeName: partId, KeyType: HASH }
+        - { AttributeName: scanId, KeyType: HASH }
       Tags:
-        - { Key: Project, Value: brailliant-inventory }
+        - { Key: Project, Value: brailliant }
 
-  PartsApi:
+  # Pillow (image library) for Linux, made by scripts/build_layer.sh
+  PillowLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: brailliant-pillow
+      ContentUri: build/layer/
+      CompatibleRuntimes: [python3.13]
+
+  ScanApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: $default
       DefaultRouteSettings:
         ThrottlingBurstLimit: 20
         ThrottlingRateLimit: 10
-      CorsConfiguration:
-        AllowOrigins: ["*"]
-        AllowMethods: [GET, POST, PUT, DELETE]
-        AllowHeaders: [content-type]
       Tags:
-        Project: brailliant-inventory
+        Project: brailliant
 
-  PartsFunction:
+  ScanFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: brailliant-parts-api
+      FunctionName: brailliant-scan-api
       CodeUri: src/
       Handler: app.lambda_handler
-      Architectures: [!Ref Architecture]
+      Layers: [!Ref PillowLayer]
       Environment:
         Variables:
-          TABLE_NAME: !Ref PartsTable
+          TABLE_NAME: !Ref ScansTable
+          OCR_ENABLED: !Ref OcrEnabled
           DYNAMODB_ENDPOINT: ""   # set in scripts/local_env.json for local testing
-      # only CRUD on this table (SAM adds the CloudWatch Logs permissions itself)
+      # only CRUD on this table + text detection (SAM adds the CloudWatch Logs permissions)
       Policies:
         - Statement:
-            - Sid: PartsTableCrud
-              Effect: Allow
+            - Effect: Allow
               Action:
                 - dynamodb:PutItem
                 - dynamodb:GetItem
@@ -69,28 +79,42 @@ Resources:
                 - dynamodb:DeleteItem
                 - dynamodb:Scan
                 - dynamodb:DescribeTable
-              Resource: !GetAtt PartsTable.Arn
+              Resource: !GetAtt ScansTable.Arn
+            - Effect: Allow
+              Action: rekognition:DetectText
+              Resource: "*"
       Events:
-        CreatePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: POST,   Path: /parts } }
-        ListParts:  { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: /parts } }
-        GetPart:    { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: "/parts/{partId}" } }
-        UpdatePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: PUT,    Path: "/parts/{partId}" } }
-        DeletePart: { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: DELETE, Path: "/parts/{partId}" } }
-        Health:     { Type: HttpApi, Properties: { ApiId: !Ref PartsApi, Method: GET,    Path: /health } }
+        CreateScan: { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: POST,   Path: /scans } }
+        ListScans:  { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: GET,    Path: /scans } }
+        GetScan:    { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: GET,    Path: "/scans/{scanId}" } }
+        UpdateScan: { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: PUT,    Path: "/scans/{scanId}" } }
+        DeleteScan: { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: DELETE, Path: "/scans/{scanId}" } }
+        Health:     { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: GET,    Path: /health } }
       Tags:
-        Project: brailliant-inventory
+        Project: brailliant
 
-  PartsFunctionLogs:
+  ScanFunctionLogs:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/${PartsFunction}
+      LogGroupName: !Sub /aws/lambda/${ScanFunction}
       RetentionInDays: 7
+
+  Budget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetEmail
+    Properties:
+      Budget:
+        BudgetName: brailliant-budget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: 1, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80 }
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref BudgetEmail }
 
 Outputs:
   ApiUrl:
-    Description: Base URL of the HTTP API
-    Value: !Sub https://${PartsApi}.execute-api.${AWS::Region}.amazonaws.com
+    Value: !Sub https://${ScanApi}.execute-api.${AWS::Region}.amazonaws.com
   TableName:
-    Value: !Ref PartsTable
-  FunctionArn:
-    Value: !GetAtt PartsFunction.Arn
+    Value: !Ref ScansTable

@@ -1,6 +1,7 @@
 {
-  "PartsFunction": {
-    "TABLE_NAME": "brailliant-parts",
-    "DYNAMODB_ENDPOINT": "http://kompaw-dynamodb:8000"
+  "ScanFunction": {
+    "TABLE_NAME": "brailliant-scans",
+    "DYNAMODB_ENDPOINT": "http://kompaw-dynamodb:8000",
+    "OCR_ENABLED": "false"
   }
 }

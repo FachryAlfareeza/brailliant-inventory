@@ -1,87 +1,95 @@
-# BrAIlliant Parts Inventory API
+# BrAIlliant Scan API
 
-Cloud Computing project (Week 12), Track C: API Gateway + Lambda + DynamoDB.
+Cloud Computing project (Week 12), Track C: API Gateway + Lambda + DynamoDB (+ Rekognition for OCR).
 
 Muhammad Fachry Alfareeza, 540199
 
-For the AAKRUTI competition I'm building BrAIlliant, a cheap multiline braille display.
-One prototype needs 98 different parts, and so far we've tracked them in an Excel sheet.
-This project is a small REST API to keep that inventory in the cloud instead: add parts,
-look them up, update the stock, and delete them. The 98 parts in `data/parts.json` come
-from our real BOM.
+For the AAKRUTI competition I'm building BrAIlliant, a cheap braille display with a camera
+and a 96 x 64 pin display. The ESP32 inside is too weak to process photos, so this is the
+cloud service it talks to: the device sends a photo and gets back
+
+- **graph mode**: the lines in the picture, scaled down to the 96 x 64 pins (edge detection with Pillow)
+- **text mode**: the text in the picture (OCR with Amazon Rekognition) as Grade 1 braille
+
+Every photo is saved as a scan job in DynamoDB, so the device or an app can list,
+label or delete it later. Photos themselves are not stored.
 
 ![architecture](docs/architecture.png)
+
+| Photo sent by the device | What the pins show |
+|---|---|
+| `data/samples/graph.png` | 96 x 64 grid returned by the Lambda (see `evidence/`) |
 
 ## Status
 
 My AWS accounts (personal and AWS Academy) were suspended on 24 Nov 2026, so I couldn't
-deploy to AWS yet. Instead I ran the same template locally with AWS SAM CLI and DynamoDB Local.
-The API test passes and all 98 parts load. The screenshots are in [evidence/](evidence/evidence.pdf).
+deploy yet. I ran the same template locally with AWS SAM CLI and DynamoDB Local instead.
+All API tests pass and graph mode works. OCR needs Rekognition, so text mode from a
+photo only works on AWS (text sent directly still becomes braille locally).
 
 ## Folders
 
 ```
-src/app.py          the Lambda function (all CRUD logic)
+src/app.py          the Lambda function (image processing, braille, CRUD)
 tests/              unit tests, use a fake table so they run without AWS
-template.yaml       SAM template (table, function, role, API)
-scripts/            deploy / teardown with the AWS CLI, local run, API test, seeding
-data/parts.json     98 parts from the BrAIlliant BOM
-docs/               design brief (.docx and .pdf), architecture diagram, deployment plan
+template.yaml       SAM template (table, Pillow layer, function, role, API, budget)
+scripts/            deploy / teardown, local run, API test, device simulator
+data/samples/       sample photos (a graph and a page of text)
+docs/               design brief (Word template + PDF), architecture diagram, deployment plan
 evidence/           screenshots and test output
-tools/              scripts that build the PDFs, the Word files and the submission zip
+tools/              fills the Word template, exports PDF, makes the submission zip
 ```
 
 ## API
 
-Base URL locally: `http://127.0.0.1:3000`
-
 | Method | Path | What it does |
 |---|---|---|
-| POST | /parts | add a part (needs `description` and `qtyInStock`) |
-| GET | /parts | list all parts, `?section=...` to filter |
-| GET | /parts/{partId} | get one part |
-| PUT | /parts/{partId} | change some fields of a part |
-| DELETE | /parts/{partId} | delete a part |
+| POST | /scans | send a photo: `deviceId`, `mode` (graph/text), `image` (base64), optional `method` (edges/dark), `label` |
+| GET | /scans | list scans, `?deviceId=...` to filter |
+| GET | /scans/{scanId} | get one scan |
+| PUT | /scans/{scanId} | change `label` or `read` |
+| DELETE | /scans/{scanId} | delete a scan |
 | GET | /health | checks that Lambda can reach the table |
 
-Example:
-
-```bash
-curl -X POST http://127.0.0.1:3000/parts -H "Content-Type: application/json" \
-  -d '{"partId":"BOM-005","description":"BQ25895 charger","qtyInStock":3}'
-curl http://127.0.0.1:3000/parts/BOM-005
-```
+A graph scan returns `dots`: 64 rows of 24 hex characters (96 bits each, 1 = raised pin).
 
 ## Running it
 
-Use **Git Bash** on Windows. In PowerShell, `bash` opens WSL, which can't see Docker Desktop.
+Use **Git Bash** on Windows (in PowerShell, `bash` opens WSL, which can't see Docker Desktop).
 
-Unit tests:
 ```bash
-python -m unittest discover -s tests -v
-```
+python -m unittest discover -s tests -v            # unit tests
 
-Locally (needs Docker Desktop and SAM CLI):
-```bash
-bash scripts/local_start.sh                        # terminal 1, keep it open
+bash scripts/local_start.sh                        # terminal 1: API on http://127.0.0.1:3000
 bash scripts/test_api.sh http://127.0.0.1:3000     # terminal 2
-python scripts/seed.py http://127.0.0.1:3000       # load the 98 parts
-bash scripts/local_stop.sh                         # when done
+python scripts/device_sim.py data/samples/graph.png        # like the device would
+python scripts/device_sim.py data/samples/text.png --mode text
+bash scripts/local_stop.sh
 ```
 
-I installed SAM CLI in a venv because I don't have admin rights for the installer:
-`python -m venv .venv-sam` and then `.venv-sam/Scripts/python -m pip install aws-sam-cli`.
+Needs Docker Desktop and SAM CLI (I installed it in a venv:
+`python -m venv .venv-sam` then `.venv-sam/Scripts/python -m pip install aws-sam-cli`).
+`scripts/build_layer.sh` downloads the Linux version of Pillow for the Lambda layer.
 
-On AWS (once my account works). Log in with an IAM user (`aws configure`), not root:
+On AWS (with an IAM user, not root):
 ```bash
 BUDGET_EMAIL=me@example.com bash scripts/deploy.sh
 bash scripts/test_api.sh
-bash scripts/teardown.sh                           # after grading
+bash scripts/teardown.sh      # deletes the whole stack
 ```
-Or with SAM: `sam build && sam deploy --guided`.
+
+## Documents
+
+`docs/design_brief.docx` and `evidence/evidence.docx` are made from my Word template
+(`docs/template/brief_template.docx`):
+
+```bash
+python tools/fill_template.py brief
+python tools/fill_template.py evidence
+```
+Then export to PDF from Word, or in PowerShell: `.\tools\export_pdf.ps1 docs\design_brief.docx`.
 
 ## Cost
 
-Everything is pay-per-request, so it costs nothing when nobody uses it. There's no EC2 or RDS
-running by the hour. I also throttled the API to 10 requests/second, kept the logs for only 7 days,
-and set a $1/month budget alert.
+Everything is pay-per-request, so it costs nothing when no one is scanning. No EC2 or RDS.
+The API is throttled to 10 requests/s, logs are kept 7 days, and there's a $1/month budget alert.

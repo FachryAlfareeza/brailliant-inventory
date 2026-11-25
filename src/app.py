@@ -1,37 +1,33 @@
-# Lambda handler for the BrAIlliant parts inventory API.
-# API Gateway (HTTP API, payload v2) calls lambda_handler, and the data
-# is stored in one DynamoDB table with partId as the key.
+# Lambda handler for the BrAIlliant scan API.
+#
+# The BrAIlliant device takes a photo and POSTs it here. Depending on the mode:
+#   graph -> edge detection, scaled down to the 96 x 64 pin display (1 = raised pin)
+#   text  -> OCR (Amazon Rekognition, only on AWS) and then Grade 1 braille
+# Every scan is saved as a "scan job" in DynamoDB so the device (or an app)
+# can fetch, label or delete it later.
 import base64
+import binascii
+import io
 import json
 import os
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
+from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 
-TABLE_NAME = os.environ.get("TABLE_NAME", "brailliant-parts")
-# only used when running locally with DynamoDB Local
-DYNAMODB_ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT", "")
+TABLE_NAME = os.environ.get("TABLE_NAME", "brailliant-scans")
+DYNAMODB_ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT", "")    # only for local testing
+OCR_ENABLED = os.environ.get("OCR_ENABLED", "true") == "true"  # Rekognition can't run locally
 
-# fields a client is allowed to send, and their types
-FIELDS = {
-    "section": str,
-    "reference": str,
-    "description": str,
-    "partNumber": str,
-    "package": str,
-    "location": str,
-    "qtyPerDevice": int,
-    "qtyInStock": int,
-    "unitCostLow": float,
-    "unitCostHigh": float,
-}
-REQUIRED = ["description", "qtyInStock"]
+GRID_W, GRID_H = 96, 64          # the BrAIlliant pin display
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
+MAX_TEXT = 5000
 
 _table = None
+_rekognition = None
 
 
 def table():
@@ -47,22 +43,22 @@ def table():
     return _table
 
 
+def rekognition():
+    global _rekognition
+    if _rekognition is None:
+        _rekognition = boto3.client("rekognition")
+    return _rekognition
+
+
 class BadRequest(Exception):
     pass
-
-
-def to_json(o):
-    # DynamoDB gives numbers back as Decimal
-    if isinstance(o, Decimal):
-        return int(o) if o % 1 == 0 else float(o)
-    raise TypeError(type(o))
 
 
 def respond(status, body):
     return {
         "statusCode": status,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body, default=to_json),
+        "body": json.dumps(body, default=lambda o: int(o) if o % 1 == 0 else float(o)),
     }
 
 
@@ -85,64 +81,152 @@ def read_body(event):
     return data
 
 
-def validate(data):
-    unknown = set(data) - set(FIELDS) - {"partId"}
+# ---------- image processing ----------
+
+def load_image(b64):
+    try:
+        raw = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError):
+        raise BadRequest("'image' must be base64")
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise BadRequest("Image is too big (max 4 MB)")
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img)  # phone/camera rotation
+        img.load()
+    except (UnidentifiedImageError, OSError):
+        raise BadRequest("'image' is not a JPEG/PNG image")
+    return raw, img
+
+
+def image_to_dots(img, method="edges"):
+    """Turns a photo into a 96 x 64 grid of raised (1) / flat (0) pins."""
+    gray = ImageOps.grayscale(img)
+    gray.thumbnail((GRID_W * 4, GRID_H * 4))          # small enough to be fast
+    gray = ImageOps.autocontrast(gray, cutoff=2)
+
+    if method == "edges":
+        # outlines of shapes, good for photos of objects or filled charts
+        work = gray.filter(ImageFilter.GaussianBlur(1)).filter(ImageFilter.FIND_EDGES)
+    else:
+        # dark ink on light paper, good for line graphs and drawings
+        work = ImageOps.invert(gray)
+
+    # fit into 96 x 64 without stretching, empty space stays flat
+    work.thumbnail((GRID_W, GRID_H), Image.Resampling.BOX)
+    canvas = Image.new("L", (GRID_W, GRID_H), 0)
+    canvas.paste(work, ((GRID_W - work.width) // 2, (GRID_H - work.height) // 2))
+
+    # threshold: raise roughly the strongest 15% of pixels, but never faint noise
+    hist = canvas.histogram()
+    total, count, level = GRID_W * GRID_H, 0, 255
+    while level > 0 and count + hist[level] <= total * 0.15:
+        count += hist[level]
+        level -= 1
+    cutoff = max(level, 40)
+
+    px = canvas.load()
+    rows = []
+    for y in range(GRID_H):
+        bits = "".join("1" if px[x, y] > cutoff else "0" for x in range(GRID_W))
+        rows.append(f"{int(bits, 2):024x}")   # 96 bits -> 24 hex chars
+    return rows
+
+
+def ocr(raw):
+    res = rekognition().detect_text(Image={"Bytes": raw})
+    lines = [d["DetectedText"] for d in res["TextDetections"] if d["Type"] == "LINE"]
+    return "\n".join(lines)
+
+
+# Simplified Grade 1 (uncontracted) braille, Unicode braille cells.
+LETTERS = "⠁⠃⠉⠙⠑⠋⠛⠓⠊⠚⠅⠇⠍⠝⠕⠏⠟⠗⠎⠞⠥⠧⠺⠭⠽⠵"
+PUNCT = {" ": " ", ",": "⠂", ";": "⠆", ":": "⠒", ".": "⠲", "!": "⠖", "?": "⠦",
+         "'": "⠄", "-": "⠤", "(": "⠐⠣", ")": "⠐⠜", '"': "⠦", "\n": "\n"}
+NUMBER_SIGN, CAPITAL_SIGN = "⠼", "⠠"
+
+
+def to_braille(text):
+    out, in_number = [], False
+    for ch in text:
+        if ch.isdigit():
+            if not in_number:
+                out.append(NUMBER_SIGN)
+                in_number = True
+            out.append(LETTERS[(int(ch) - 1) % 10])  # 1-9 = a-i, 0 = j
+            continue
+        if in_number and ch not in ".,":
+            in_number = False
+        low = ch.lower()
+        if "a" <= low <= "z":
+            if ch.isupper():
+                out.append(CAPITAL_SIGN)
+            out.append(LETTERS[ord(low) - ord("a")])
+        else:
+            out.append(PUNCT.get(ch, "⠿"))  # unknown symbol
+    return "".join(out)
+
+
+# ---------- CRUD ----------
+
+def create_scan(event):
+    data = read_body(event)
+    unknown = set(data) - {"deviceId", "mode", "image", "text", "method", "label"}
     if unknown:
         raise BadRequest("Unknown field(s): " + ", ".join(sorted(unknown)))
-    item = {}
-    for key, value in data.items():
-        if key == "partId":
-            continue
-        if FIELDS[key] is str:
-            if not isinstance(value, str):
-                raise BadRequest(f"'{key}' must be a string")
-            item[key] = value.strip()
-            continue
-        # numbers (bool is a subclass of int, so exclude it)
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise BadRequest(f"'{key}' must be a number")
-        if value < 0:
-            raise BadRequest(f"'{key}' must not be negative")
-        if FIELDS[key] is int:
-            if int(value) != value:
-                raise BadRequest(f"'{key}' must be an integer")
-            item[key] = int(value)
+
+    device = data.get("deviceId")
+    if not isinstance(device, str) or not device.strip() or len(device) > 64:
+        raise BadRequest("'deviceId' is required (max 64 characters)")
+    mode = data.get("mode")
+    if mode not in ("graph", "text"):
+        raise BadRequest("'mode' must be 'graph' or 'text'")
+    label = data.get("label", "")
+    if not isinstance(label, str) or len(label) > 100:
+        raise BadRequest("'label' must be a string (max 100 characters)")
+
+    item = {"scanId": "S-" + uuid.uuid4().hex[:10], "deviceId": device.strip(),
+            "mode": mode, "label": label, "read": False, "createdAt": now()}
+
+    if mode == "graph":
+        method = data.get("method", "edges")
+        if method not in ("edges", "dark"):
+            raise BadRequest("'method' must be 'edges' or 'dark'")
+        if not isinstance(data.get("image"), str):
+            raise BadRequest("'image' (base64 JPEG/PNG) is required for graph mode")
+        _, img = load_image(data["image"])
+        item.update(method=method, sourceSize=f"{img.width}x{img.height}",
+                    width=GRID_W, height=GRID_H, dots=image_to_dots(img, method))
+        item["dotCount"] = sum(bin(int(r, 16)).count("1") for r in item["dots"])
+        item["status"] = "done"
+    else:
+        if isinstance(data.get("text"), str):
+            # text sent directly (lets me test braille without OCR)
+            text = data["text"]
+        elif isinstance(data.get("image"), str):
+            raw, img = load_image(data["image"])
+            item["sourceSize"] = f"{img.width}x{img.height}"
+            if not OCR_ENABLED:
+                item.update(status="failed", error="OCR only runs on AWS (Rekognition)")
+                item["updatedAt"] = item["createdAt"]
+                table().put_item(Item=item)
+                return respond(201, item)
+            text = ocr(raw)
         else:
-            item[key] = Decimal(str(value))  # DynamoDB doesn't accept float
-    return item
+            raise BadRequest("Text mode needs 'image' or 'text'")
+        text = text[:MAX_TEXT]
+        item.update(text=text, braille=to_braille(text), status="done")
 
-
-def is_condition_error(e):
-    return e.response["Error"]["Code"] == "ConditionalCheckFailedException"
-
-
-def create_part(event):
-    data = read_body(event)
-    item = validate(data)
-    for f in REQUIRED:
-        if f not in item:
-            raise BadRequest(f"Missing required field: {f}")
-    if not item["description"]:
-        raise BadRequest("'description' must not be empty")
-
-    part_id = str(data.get("partId") or "P-" + uuid.uuid4().hex[:8]).strip()
-    item["partId"] = part_id
-    item["createdAt"] = item["updatedAt"] = now()
-    try:
-        table().put_item(Item=item, ConditionExpression=Attr("partId").not_exists())
-    except ClientError as e:
-        if is_condition_error(e):
-            return respond(409, {"error": f"Part '{part_id}' already exists"})
-        raise
+    item["updatedAt"] = item["createdAt"]
+    table().put_item(Item=item)
     return respond(201, item)
 
 
-def list_parts(event):
+def list_scans(event):
     params = event.get("queryStringParameters") or {}
     args = {}
-    if params.get("section"):
-        args["FilterExpression"] = Attr("section").eq(params["section"])
-
+    if params.get("deviceId"):
+        args["FilterExpression"] = Attr("deviceId").eq(params["deviceId"])
     items = []
     while True:
         page = table().scan(**args)
@@ -150,80 +234,78 @@ def list_parts(event):
         if "LastEvaluatedKey" not in page:
             break
         args["ExclusiveStartKey"] = page["LastEvaluatedKey"]
-    items.sort(key=lambda i: i["partId"])
+    items.sort(key=lambda i: i["createdAt"], reverse=True)
     return respond(200, {"count": len(items), "items": items})
 
 
-def get_part(part_id):
-    item = table().get_item(Key={"partId": part_id}).get("Item")
+def get_scan(scan_id):
+    item = table().get_item(Key={"scanId": scan_id}).get("Item")
     if not item:
-        return respond(404, {"error": f"Part '{part_id}' not found"})
+        return respond(404, {"error": f"Scan '{scan_id}' not found"})
     return respond(200, item)
 
 
-def update_part(event, part_id):
-    changes = validate(read_body(event))
-    if not changes:
-        raise BadRequest("Nothing to update")
-    if changes.get("description") == "":
-        raise BadRequest("'description' must not be empty")
-    changes["updatedAt"] = now()
-
-    expr = "SET " + ", ".join(f"#{k} = :{k}" for k in changes)
+def update_scan(event, scan_id):
+    data = read_body(event)
+    unknown = set(data) - {"label", "read"}
+    if unknown or not data:
+        raise BadRequest("Only 'label' and 'read' can be changed")
+    if "label" in data and (not isinstance(data["label"], str) or len(data["label"]) > 100):
+        raise BadRequest("'label' must be a string (max 100 characters)")
+    if "read" in data and not isinstance(data["read"], bool):
+        raise BadRequest("'read' must be true or false")
+    data["updatedAt"] = now()
     try:
         res = table().update_item(
-            Key={"partId": part_id},
-            UpdateExpression=expr,
-            ExpressionAttributeNames={f"#{k}": k for k in changes},
-            ExpressionAttributeValues={f":{k}": v for k, v in changes.items()},
-            ConditionExpression=Attr("partId").exists(),
+            Key={"scanId": scan_id},
+            UpdateExpression="SET " + ", ".join(f"#{k} = :{k}" for k in data),
+            ExpressionAttributeNames={f"#{k}": k for k in data},
+            ExpressionAttributeValues={f":{k}": v for k, v in data.items()},
+            ConditionExpression=Attr("scanId").exists(),
             ReturnValues="ALL_NEW",
         )
     except ClientError as e:
-        if is_condition_error(e):
-            return respond(404, {"error": f"Part '{part_id}' not found"})
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            return respond(404, {"error": f"Scan '{scan_id}' not found"})
         raise
     return respond(200, res["Attributes"])
 
 
-def delete_part(part_id):
+def delete_scan(scan_id):
     try:
-        table().delete_item(Key={"partId": part_id},
-                            ConditionExpression=Attr("partId").exists())
+        table().delete_item(Key={"scanId": scan_id}, ConditionExpression=Attr("scanId").exists())
     except ClientError as e:
-        if is_condition_error(e):
-            return respond(404, {"error": f"Part '{part_id}' not found"})
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            return respond(404, {"error": f"Scan '{scan_id}' not found"})
         raise
-    return respond(200, {"deleted": part_id})
+    return respond(200, {"deleted": scan_id})
 
 
 def health():
-    # checks that the function can actually reach the table
     info = table().meta.client.describe_table(TableName=TABLE_NAME)["Table"]
-    return respond(200, {"status": "ok", "table": TABLE_NAME,
-                         "tableStatus": info["TableStatus"],
-                         "itemCount": info.get("ItemCount", 0), "time": now()})
+    return respond(200, {"status": "ok", "table": TABLE_NAME, "tableStatus": info["TableStatus"],
+                         "ocr": OCR_ENABLED, "time": now()})
 
 
 def lambda_handler(event, context):
     route = event.get("routeKey", "")
-    part_id = (event.get("pathParameters") or {}).get("partId")
+    scan_id = (event.get("pathParameters") or {}).get("scanId")
     try:
-        if route == "POST /parts":
-            return create_part(event)
-        if route == "GET /parts":
-            return list_parts(event)
-        if route == "GET /parts/{partId}":
-            return get_part(part_id)
-        if route == "PUT /parts/{partId}":
-            return update_part(event, part_id)
-        if route == "DELETE /parts/{partId}":
-            return delete_part(part_id)
+        if route == "POST /scans":
+            return create_scan(event)
+        if route == "GET /scans":
+            return list_scans(event)
+        if route == "GET /scans/{scanId}":
+            return get_scan(scan_id)
+        if route == "PUT /scans/{scanId}":
+            return update_scan(event, scan_id)
+        if route == "DELETE /scans/{scanId}":
+            return delete_scan(scan_id)
         if route == "GET /health":
             return health()
         return respond(404, {"error": f"Unknown route '{route}'"})
     except BadRequest as e:
         return respond(400, {"error": str(e)})
     except ClientError as e:
-        print("DynamoDB error:", e)
-        return respond(500, {"error": "Database error"})
+        print("AWS error:", e)
+        return respond(500, {"error": "Server error"})

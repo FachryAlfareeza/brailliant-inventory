@@ -8,4 +8,8 @@ mkdir -p submission
 [[ -z "$(git status --porcelain)" ]] || echo "warning: you have uncommitted changes"
 git archive --format=zip --prefix=$NAME/ -o submission/$NAME.zip HEAD
 cp docs/design_brief.pdf submission/${NAME}_DesignBrief.pdf
+cp docs/design_brief.docx submission/${NAME}_DesignBrief.docx
+[[ -f evidence/evidence.docx ]] && cp evidence/evidence.docx submission/${NAME}_Evidence.docx
+[[ -f evidence/evidence.pdf ]] && cp evidence/evidence.pdf submission/${NAME}_Evidence.pdf
+true
 echo "made submission/$NAME.zip"

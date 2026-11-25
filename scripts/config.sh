@@ -10,27 +10,17 @@ fi
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export AWS_DEFAULT_REGION="$AWS_REGION"
 export AWS_PAGER=""
-export MSYS_NO_PATHCONV=1   # stops Git Bash turning "/parts" into a Windows path
+export MSYS_NO_PATHCONV=1   # stops Git Bash turning "/scans" into a Windows path
 
-PROJECT="brailliant-inventory"
-TABLE_NAME="brailliant-parts"
-FUNCTION_NAME="brailliant-parts-api"
-API_NAME="brailliant-parts-http-api"
-ROLE_NAME_OWN="brailliant-parts-lambda-role"   # created on a normal account
-ROLE_NAME_LAB="LabRole"                        # Learner Lab can't create roles
+STACK_NAME="brailliant"
+TABLE_NAME="brailliant-scans"
 
-BUDGET_NAME="brailliant-inventory-budget"
-BUDGET_LIMIT_USD="${BUDGET_LIMIT_USD:-1}"
-BUDGET_EMAIL="${BUDGET_EMAIL:-}"
-
-# run from the repo root and use relative paths, because aws.exe and
-# python.exe on Windows can't read Git Bash paths like /d/Coding/...
+# run from the repo root with relative paths (aws.exe and python.exe can't read /d/... paths)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-BUILD_DIR="build"
 URL_FILE="scripts/.api_url"
 
 PY=python
 command -v python >/dev/null 2>&1 || PY=python3
-
-is_learner_lab() { [[ "${CALLER_ARN:-}" == *"/voclabs/"* ]]; }
+SAM=sam
+command -v sam >/dev/null 2>&1 || SAM=.venv-sam/Scripts/sam.exe
