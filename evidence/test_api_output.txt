@@ -1,18 +1,18 @@
-API test - http://127.0.0.1:3000 - 2026-11-25 08:01:40
+API test - http://127.0.0.1:3000 - 2026-11-25 08:38:36
 
 # health check (API -> Lambda -> DynamoDB)
 $ curl -X GET http://127.0.0.1:3000/health 
-{"status": "ok", "table": "brailliant-scans", "tableStatus": "ACTIVE", "ocr": false, "time": "2026-11-25T01:01:42+00:00"}
+{"status": "ok", "table": "brailliant-scans", "tableStatus": "ACTIVE", "ocr": false, "time": "2026-11-25T01:38:39+00:00"}
 PASS
 
 # create: graph photo -> 96 x 64 pins
 $ curl -X POST http://127.0.0.1:3000/scans -d '@build/graph_request.json'
-{"scanId": "S-e3f9830124", "deviceId": "brailliant-01", "mode": "graph", "label": "sample graph", "read": false, "createdAt": "2026-11-25T01:01:43+00:00", "method": "dark", "sourceSize": "1200x800", "width": 96, "height": 64, "dots": ["000000000000000000000000", "000000000000000000000000", "00000000 ...
+{"scanId": "S-c5b57dd21d", "deviceId": "brailliant-01", "mode": "graph", "label": "sample graph", "read": false, "createdAt": "2026-11-25T01:38:40+00:00", "method": "dark", "sourceSize": "1200x800", "width": 96, "height": 64, "dots": ["000000000000000000000000", "000000000000000000000000", "00000000 ...
 PASS
 
 # create: text -> Grade 1 braille
 $ curl -X POST http://127.0.0.1:3000/scans -d '{"deviceId":"brailliant-01","mode":"text","text":"F = m x a"}'
-{"scanId": "S-3473f4a9a1", "deviceId": "brailliant-01", "mode": "text", "label": "", "read": false, "createdAt": "2026-11-25T01:01:45+00:00", "text": "F = m x a", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:01:45+00:00"}
+{"scanId": "S-f174d7caf8", "deviceId": "brailliant-01", "mode": "text", "label": "", "read": false, "createdAt": "2026-11-25T01:38:41+00:00", "text": "F = m x a", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:38:41+00:00"}
 PASS
 
 # create: bad input
@@ -21,26 +21,26 @@ $ curl -X POST http://127.0.0.1:3000/scans -d '{"deviceId":"brailliant-01","mode
 PASS
 
 # read
-$ curl -X GET http://127.0.0.1:3000/scans/S-e3f9830124 
+$ curl -X GET http://127.0.0.1:3000/scans/S-c5b57dd21d 
 {"read": false, "method": "dark", "dots": ["000000000000000000000000", "000000000000000000000000", "000000000000000000000000", "000000000000000000000000", "000000000000000000000000", "000000000000000000000000", "004000000000000000000000", "004000000000000000000000", "004000000000000000000000", "0040 ...
 PASS
 
 $ curl -X GET http://127.0.0.1:3000/scans?deviceId=brailliant-01 
-{"count": 6, "items": [{"mode": "text", "createdAt": "2026-11-25T01:01:45+00:00", "read": false, "scanId": "S-3473f4a9a1", "label": "", "text": "F = m x a", "deviceId": "brailliant-01", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:01:45+00:00"} ...
+{"count": 7, "items": [{"mode": "text", "createdAt": "2026-11-25T01:38:41+00:00", "read": false, "scanId": "S-f174d7caf8", "label": "", "text": "F = m x a", "deviceId": "brailliant-01", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:38:41+00:00"} ...
 PASS
 
 # update
-$ curl -X PUT http://127.0.0.1:3000/scans/S-3473f4a9a1 -d '{"label":"Physics p.12","read":true}'
-{"mode": "text", "createdAt": "2026-11-25T01:01:45+00:00", "read": true, "scanId": "S-3473f4a9a1", "label": "Physics p.12", "text": "F = m x a", "deviceId": "brailliant-01", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:01:50+00:00"}
+$ curl -X PUT http://127.0.0.1:3000/scans/S-f174d7caf8 -d '{"label":"Physics p.12","read":true}'
+{"mode": "text", "createdAt": "2026-11-25T01:38:41+00:00", "read": true, "scanId": "S-f174d7caf8", "label": "Physics p.12", "text": "F = m x a", "deviceId": "brailliant-01", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-25T01:38:47+00:00"}
 PASS
 
 # delete
-$ curl -X DELETE http://127.0.0.1:3000/scans/S-3473f4a9a1 
-{"deleted": "S-3473f4a9a1"}
+$ curl -X DELETE http://127.0.0.1:3000/scans/S-f174d7caf8 
+{"deleted": "S-f174d7caf8"}
 PASS
 
-$ curl -X GET http://127.0.0.1:3000/scans/S-3473f4a9a1 
-{"error": "Scan 'S-3473f4a9a1' not found"}
+$ curl -X GET http://127.0.0.1:3000/scans/S-f174d7caf8 
+{"error": "Scan 'S-f174d7caf8' not found"}
 PASS
 
 Failed: 0

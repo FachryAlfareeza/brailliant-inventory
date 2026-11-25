@@ -174,7 +174,7 @@ SHOTS = [
      "kompaw-dynamodb is DynamoDB Local (port 8010). The other container is the Lambda runtime "
      "(Python 3.13 with the Pillow layer) that SAM starts."),
     ("L2_sam_build_and_start.png", "L2. sam build and sam local start-api",
-     "template.yaml builds and the routes /scans, /scans/{scanId} and /health are served on http://127.0.0.1:3000."),
+     "template.yaml is valid and builds, and SAM starts the Lambda runtime with the Pillow layer. The API then runs on http://127.0.0.1:3000 (requests in L7)."),
     ("L3_api_test_pass.png", "L3. API test",
      "scripts/test_api.sh: health check, create (graph photo and text), bad input, read, list, update, delete "
      "and read-after-delete. All 9 checks pass. Full output in evidence/test_api_output.txt."),
@@ -184,7 +184,7 @@ SHOTS = [
     ("L5_graph_to_pins.png", "L5. Photo and the pins it becomes",
      "Left: the photo that was sent. Right: the 96 x 64 grid from the Lambda, white dots are raised pins."),
     ("L6_dynamodb_scans.png", "L6. Scans stored in DynamoDB",
-     "The scan jobs saved in the brailliant-scans table."),
+     "Number of scan jobs saved in the brailliant-scans table after the API test and the simulator run."),
     ("L7_lambda_logs.png", "L7. Lambda logs",
      "START / END / REPORT lines for each request, with duration and memory."),
 ]
@@ -203,7 +203,8 @@ def evidence():
         if not (ev / file).exists():
             print("missing, skipped:", file)
             continue
-        body += [heading(title), para(text, keep_next=True), picture(ev / file, max_h_cm=10)]
+        # heading + caption stay with the picture, but the picture must not chain to the next block
+        body += [heading(title), para(text, keep_next=True), picture(ev / file, max_h_cm=10, keep_next=False)]
 
     email = ev / "L8_aws_suspended_email.pdf"
     if email.exists():
