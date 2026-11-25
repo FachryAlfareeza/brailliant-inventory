@@ -2,7 +2,7 @@
 #
 # The BrAIlliant device takes a photo and POSTs it here. Depending on the mode:
 #   graph -> edge detection, scaled down to the 96 x 64 pin display (1 = raised pin)
-#   text  -> OCR (Amazon Rekognition, only on AWS) and then Grade 1 braille
+#   text  -> OCR (Amazon Textract, only on AWS) and then Grade 1 braille
 # Every scan is saved as a "scan job" in DynamoDB so the device (or an app)
 # can fetch, label or delete it later.
 import base64
@@ -20,14 +20,14 @@ from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "brailliant-scans")
 DYNAMODB_ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT", "")    # only for local testing
-OCR_ENABLED = os.environ.get("OCR_ENABLED", "true") == "true"  # Rekognition can't run locally
+OCR_ENABLED = os.environ.get("OCR_ENABLED", "true") == "true"  # Textract can't run locally
 
 GRID_W, GRID_H = 96, 64          # the BrAIlliant pin display
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAX_TEXT = 5000
 
 _table = None
-_rekognition = None
+_textract = None
 
 
 def table():
@@ -43,11 +43,11 @@ def table():
     return _table
 
 
-def rekognition():
-    global _rekognition
-    if _rekognition is None:
-        _rekognition = boto3.client("rekognition")
-    return _rekognition
+def textract():
+    global _textract
+    if _textract is None:
+        _textract = boto3.client("textract")
+    return _textract
 
 
 class BadRequest(Exception):
@@ -134,9 +134,9 @@ def image_to_dots(img, method="edges"):
 
 
 def ocr(raw):
-    res = rekognition().detect_text(Image={"Bytes": raw})
-    lines = [d["DetectedText"] for d in res["TextDetections"] if d["Type"] == "LINE"]
-    return "\n".join(lines)
+    # Textract is made for document pages (Rekognition is more for signs and labels)
+    res = textract().detect_document_text(Document={"Bytes": raw})
+    return "\n".join(b["Text"] for b in res["Blocks"] if b["BlockType"] == "LINE")
 
 
 # Simplified Grade 1 (uncontracted) braille, Unicode braille cells.
@@ -207,7 +207,7 @@ def create_scan(event):
             raw, img = load_image(data["image"])
             item["sourceSize"] = f"{img.width}x{img.height}"
             if not OCR_ENABLED:
-                item.update(status="failed", error="OCR only runs on AWS (Rekognition)")
+                item.update(status="failed", error="OCR only runs on AWS (Textract)")
                 item["updatedAt"] = item["createdAt"]
                 table().put_item(Item=item)
                 return respond(201, item)

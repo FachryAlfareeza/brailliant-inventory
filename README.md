@@ -1,6 +1,6 @@
 # BrAIlliant Scan API
 
-Cloud Computing project (Week 12), Track C: API Gateway + Lambda + DynamoDB (+ Rekognition for OCR).
+Cloud Computing project (Week 12), Track C: API Gateway + Lambda + DynamoDB (+ Textract for OCR).
 
 Muhammad Fachry Alfareeza, 540199
 
@@ -9,7 +9,7 @@ and a 96 x 64 pin display. The ESP32 inside is too weak to process photos, so th
 cloud service it talks to: the device sends a photo and gets back
 
 - **graph mode**: the lines in the picture, scaled down to the 96 x 64 pins (edge detection with Pillow)
-- **text mode**: the text in the picture (OCR with Amazon Rekognition) as Grade 1 braille
+- **text mode**: the text in the picture (OCR with Amazon Textract) as Grade 1 braille
 
 Every photo is saved as a scan job in DynamoDB, so the device or an app can list,
 label or delete it later. Photos themselves are not stored.
@@ -24,7 +24,7 @@ label or delete it later. Photos themselves are not stored.
 
 My AWS accounts (personal and AWS Academy) were suspended on 24 Nov 2026, so I couldn't
 deploy yet. I ran the same template locally with AWS SAM CLI and DynamoDB Local instead.
-All API tests pass and graph mode works. OCR needs Rekognition, so text mode from a
+All API tests pass and graph mode works. OCR needs Textract, so text mode from a
 photo only works on AWS (text sent directly still becomes braille locally).
 
 ## Folders

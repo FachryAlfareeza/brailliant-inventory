@@ -2,7 +2,7 @@
 # Runs the API on this PC without AWS:
 #   sam local start-api (Lambda in Docker) + DynamoDB Local (also Docker)
 # API: http://127.0.0.1:3000   Stop: Ctrl+C, then scripts/local_stop.sh
-# OCR (Rekognition) is switched off locally, everything else works.
+# OCR (Textract) is switched off locally, everything else works.
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 

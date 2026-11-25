@@ -12,7 +12,7 @@
 1. **DynamoDB table** `brailliant-scans`, key `scanId`, on-demand billing.
 2. **Lambda layer** `brailliant-pillow`: the Linux build of Pillow (`scripts/build_layer.sh`).
 3. **Lambda function** `brailliant-scan-api`: Python 3.13, 512 MB (Pillow needs it for camera photos), 15 s timeout.
-4. **IAM role** for the function (made by SAM): CRUD on the table only, `rekognition:DetectText`,
+4. **IAM role** for the function (made by SAM): CRUD on the table only, `textract:DetectDocumentText`,
    and writing its own logs.
 5. **HTTP API** with the 6 routes, `$default` stage, throttled to 10 requests/s (burst 20).
 6. **Log group** with 7 day retention.
@@ -45,7 +45,12 @@ Locally I can do everything except the OCR check and the console checks (see `ev
 
 ## Next weeks
 
-- store photos in S3 and use Textract for full pages (better than Rekognition for documents)
+- store photos in S3 (presigned upload) instead of base64 in the request
 - Grade 2 braille with Liblouis, math mode (Nemeth)
-- device login (API key per device or Cognito)
-- CloudWatch alarm for errors, GitHub Actions for the unit tests
+- device login with a Lambda authorizer (no Cognito or IoT Core: they bill per user or per connected minute)
+- Polly audio for the speaker
+- GitHub Actions to run the unit tests on every push
+
+No CloudWatch alarms on purpose: they bill per alarm per month, and BrAIlliant avoids
+anything billed by time. The budget alert covers cost mistakes.
+The full plan for the product is in the BrAIlliant cloud masterplan (AAKRUTI project folder).

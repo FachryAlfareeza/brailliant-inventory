@@ -118,6 +118,20 @@ class ScanTests(unittest.TestCase):
         status, scan = call("POST /scans", {"deviceId": "dev-1", "mode": "text", "image": image})
         self.assertEqual((status, scan["status"]), (201, "failed"))
 
+    def test_text_image_with_ocr(self):
+        class FakeTextract:  # pretends to be Textract
+            def detect_document_text(self, Document):
+                return {"Blocks": [{"BlockType": "PAGE"},
+                                   {"BlockType": "LINE", "Text": "Hi"},
+                                   {"BlockType": "WORD", "Text": "Hi"}]}
+        app._textract, app.OCR_ENABLED = FakeTextract(), True
+        try:
+            image = png_b64(lambda d: d.text((10, 10), "Hi", fill="black"))
+            status, scan = call("POST /scans", {"deviceId": "dev-1", "mode": "text", "image": image})
+        finally:
+            app._textract, app.OCR_ENABLED = None, False
+        self.assertEqual((status, scan["text"], scan["braille"]), (201, "Hi", "⠠⠓⠊"))
+
     def test_crud_cycle(self):
         _, scan = call("POST /scans", {"deviceId": "dev-1", "mode": "text", "text": "abc"})
         sid = scan["scanId"]

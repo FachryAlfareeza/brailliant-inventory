@@ -120,10 +120,10 @@ def brief():
              "a *scan job*, like a ticket, that the device or an app can look up, label or delete later."),
 
         heading("Track and why"),
-        para("I chose **Track C: API Gateway (HTTP API) + Lambda + DynamoDB**, with Amazon Rekognition for OCR."),
-        bullet("**Cost.** A device sends a scan every few minutes, so paying per request costs almost nothing. "
-               "An EC2 server (Track A/B) is charged every hour. The API is also throttled to 10 requests/s, "
-               "logs are kept 7 days, and there's a $1/month budget alert."),
+        para("I chose **Track C: API Gateway (HTTP API) + Lambda + DynamoDB**, with Amazon Textract for OCR."),
+        bullet("**Cost.** BrAIlliant is meant to be cheap, so I only use services billed per request, nothing "
+               "charged per hour while idle (an EC2 server in Track A/B would be). The API is throttled to "
+               "10 requests/s, logs are kept 7 days, and there's a $1/month budget alert."),
         bullet("**Fits the job.** Each scan is short and independent, which is what Lambda is for. The image "
                "library (Pillow) is added as a Lambda layer. No servers to patch and no VPC to set up."),
 
@@ -152,19 +152,19 @@ def brief():
         picture(ROOT / "docs" / "architecture.png", max_h_cm=12),
         para("*Figure 1. Request flow (1 to 6), IAM/security and how the stack is deployed.*"),
         para("**Request flow:** the device sends the photo (base64 JPEG) over HTTPS to API Gateway, which invokes "
-             "Lambda. The function processes the image (calling Rekognition in text mode), saves the scan in "
+             "Lambda. The function processes the image (calling Textract in text mode), saves the scan in "
              "DynamoDB and returns the pins or braille for the display."),
-        para("**IAM:** the Lambda role can only do CRUD on this one table, call rekognition:DetectText and write its "
+        para("**IAM:** the Lambda role can only do CRUD on this one table, call textract:DetectDocumentText and write its "
              "own logs. Only this API may invoke the function, and I deploy with an IAM user, not root."),
         para("**Network and privacy:** no VPC, HTTPS only, DynamoDB encrypted at rest. Photos may show private "
-             "documents, so they are processed in memory and never saved. Device login comes later."),
+             "documents, so they are processed in memory and never saved. Device login (a Lambda authorizer) comes later."),
 
         heading("Environment and status"),
         para("Repo: https://github.com/FachryAlfareeza/brailliant-inventory (Lambda code, unit tests, SAM template, "
              "deploy script, API test script, device simulator). My AWS accounts were suspended on 24 Nov, so I "
              "tested locally with AWS SAM CLI and DynamoDB Local: all 9 API tests pass, and a sample graph photo "
-             "becomes a 96 x 64 pin picture (see the evidence). OCR needs Rekognition, so it only works once "
-             "deployed. **Next:** sam deploy, S3 + Textract for full pages, Grade 2 braille (Liblouis), device login."),
+             "becomes a 96 x 64 pin picture (see the evidence). OCR needs Textract, so it only works once "
+             "deployed. **Next:** sam deploy, S3 upload, device login, Polly audio, Grade 2 braille (Liblouis)."),
     ]
 
 
@@ -197,7 +197,7 @@ def evidence():
         para("**Note:** these screenshots are from running the project locally, not on AWS, because my AWS "
              "accounts are suspended (see L8). I used AWS SAM CLI to run the Lambda function and API in Docker, "
              "and DynamoDB Local for the database. The same template.yaml deploys to AWS with sam deploy. "
-             "OCR (Rekognition) can only be shown after deploying."),
+             "OCR (Textract) can only be shown after deploying."),
     ]
     for file, title, text in SHOTS:
         if not (ev / file).exists():

@@ -55,7 +55,7 @@
   <text x="614" y="226" class="x">grayscale, edges or dark ink,</text>
   <text x="614" y="242" class="x">fit and threshold to 96 x 64 pins</text>
   <text x="614" y="266" class="lbl">text mode</text>
-  <text x="614" y="282" class="x">OCR with Rekognition, then</text>
+  <text x="614" y="282" class="x">OCR with Textract, then</text>
   <text x="614" y="298" class="x">Grade 1 braille</text>
   <text x="725" y="326" text-anchor="middle" class="x">Pillow layer, 512 MB, 15 s</text>
 
@@ -71,10 +71,10 @@
   <text x="934" y="298" class="x">createdAt, updatedAt</text>
   <text x="1035" y="326" text-anchor="middle" class="x">one item ~2 KB, no photos kept</text>
 
-  <!-- Rekognition + CloudWatch -->
+  <!-- Textract + CloudWatch -->
   <rect x="920" y="380" width="230" height="80" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.6"/>
-  <text x="1035" y="408" text-anchor="middle" class="t">Amazon Rekognition</text>
-  <text x="1035" y="428" text-anchor="middle" class="x">DetectText (text mode only)</text>
+  <text x="1035" y="408" text-anchor="middle" class="t">Amazon Textract</text>
+  <text x="1035" y="428" text-anchor="middle" class="x">DetectDocumentText (text mode)</text>
   <text x="1035" y="444" text-anchor="middle" class="x">off when testing locally</text>
   <rect x="600" y="400" width="250" height="70" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
   <text x="725" y="428" text-anchor="middle" class="t">CloudWatch Logs</text>
@@ -101,7 +101,7 @@
   <text x="314" y="402" class="red">IAM / security</text>
   <text x="314" y="422" class="x">- only this API can invoke the Lambda</text>
   <text x="314" y="440" class="x">- Lambda role: CRUD on this one table,</text>
-  <text x="314" y="456" class="x">  rekognition:DetectText, own logs</text>
+  <text x="314" y="456" class="x">  textract:DetectDocumentText, own logs</text>
   <text x="314" y="474" class="x">- HTTPS, DynamoDB encrypted at rest</text>
   <text x="314" y="492" class="x">- photos are not stored</text>
 
@@ -123,9 +123,9 @@
   <text x="515" y="660" text-anchor="middle" class="x">role, HTTP API + 6 routes, log group, budget</text>
   <text x="515" y="676" text-anchor="middle" class="x">deployed by an IAM user, not root</text>
   <rect x="720" y="600" width="430" height="100" rx="8" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="5 4"/>
-  <text x="935" y="624" text-anchor="middle" class="lbl">Later weeks</text>
-  <text x="935" y="644" text-anchor="middle" class="x">S3 for photos + Textract for full pages</text>
-  <text x="935" y="660" text-anchor="middle" class="x">Grade 2 braille (Liblouis), math mode (Nemeth)</text>
-  <text x="935" y="676" text-anchor="middle" class="x">device login (API key / Cognito)</text>
+  <text x="935" y="624" text-anchor="middle" class="lbl">Later (BrAIlliant cloud masterplan)</text>
+  <text x="935" y="644" text-anchor="middle" class="x">S3 photo upload, device login (Lambda authorizer)</text>
+  <text x="935" y="660" text-anchor="middle" class="x">Polly audio, Grade 2 braille (Liblouis)</text>
+  <text x="935" y="676" text-anchor="middle" class="x">Bedrock: math to Nemeth (all pay-per-use)</text>
   <path d="M 515 600 L 515 534" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
 </svg>
