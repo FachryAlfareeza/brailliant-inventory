@@ -113,30 +113,31 @@ def picture(path, max_h_cm=11.0, keep_next=True):
 def brief():
     return [
         heading("Use case"),
-        para("I'm on the team building BrAIlliant, a cheap braille display with a camera and a 96 x 64 pin "
-             "display, for the SOLIDWORKS AAKRUTI 2026 competition. Its ESP32 is too weak for image processing "
-             "or OCR, so it needs a cloud service. This project is that service: the device sends a photo, and in "
-             "**graph** mode the cloud turns the lines in it into the 96 x 64 pins, so a blind student can feel a "
-             "textbook chart. In **text** mode it reads the text (OCR) and turns it into braille. Every photo becomes "
-             "a *scan job*, like a ticket, that the device or an app can look up, label or delete later."),
+        para("BrAIlliant is a low-cost braille display my team is building for SOLIDWORKS AAKRUTI 2026. It has a "
+             "camera and a 96 x 64 grid of pins, but the ESP32 inside can't do image processing or OCR by itself. "
+             "This project is the cloud side that does that work for it. The device sends a photo. In **graph** "
+             "mode, the cloud picks out the lines and scales them down to the pin grid, so a blind student can feel "
+             "a chart from a textbook. In **text** mode, it reads the text with OCR and turns it into braille. Each "
+             "photo is saved as a *scan job* that the device (or a phone app later on) can look up, rename or delete."),
 
         heading("Track and why"),
-        para("I chose **Track C: API Gateway (HTTP API) + Lambda + DynamoDB**, with Amazon Textract for OCR."),
-        bullet("**Cost.** BrAIlliant is meant to be cheap, so I only use services billed per request, nothing "
-               "charged per hour while idle (an EC2 server in Track A/B would be). The API is throttled to "
-               "10 requests/s, logs are kept 7 days, and there's a $1/month budget alert."),
-        bullet("**Fits the job.** Each scan is short and independent, which is what Lambda is for. The image "
-               "library (Pillow) is added as a Lambda layer. No servers to patch and no VPC to set up."),
+        para("I went with **Track C: API Gateway (HTTP API) + Lambda + DynamoDB**, plus Amazon Textract for the OCR."),
+        bullet("**Cost.** The whole point of BrAIlliant is to be affordable, so I stuck to services that charge per "
+               "request. An EC2 server from Track A or B would cost money even when nobody is scanning. I also "
+               "limited the API to 10 requests per second, keep logs for 7 days and set a $1/month budget alert."),
+        bullet("**It suits the work.** A scan is a short job that doesn't depend on any other scan, which is what "
+               "Lambda is good at. Pillow, the image library, goes in as a Lambda layer, and I have no server or "
+               "VPC to maintain."),
 
         heading("Data entity: ScanJob"),
-        para("Stored in the DynamoDB table brailliant-scans. The key is scanId."),
+        para("Scan jobs are kept in a DynamoDB table called brailliant-scans, with scanId as the key."),
         table(["Field", "Type", "Notes", "Example"], [
             ["scanId", "string", "key, made by the server", "S-2df004a818"],
-            ["deviceId", "string", "required, which device sent it", "brailliant-01"],
+            ["deviceId", "string", "required, the device that sent it", "brailliant-01"],
             ["mode, status", "string", "graph or text; done or failed", "graph, done"],
             ["dots, dotCount", "list, number", "graph: 64 rows of 96 bits (hex)", "64 x \"000…f0\", 401"],
-            ["text, braille", "string", "text: OCR result and Grade 1 braille", "Hi → ⠠⠓⠊"],
-            ["label, read", "string, bool", "can be changed later", "Physics p.12, true"],
+            ["text, braille", "string", "text: what OCR read, in Grade 1 braille", "Hi → ⠠⠓⠊"],
+            ["label, read", "string, bool", "the user can change these", "Physics p.12, true"],
             ["createdAt, updatedAt", "string", "set by the server", "2026-11-25T01:02:03Z"],
         ], [2000, 1400, 3226, 2400]),
 
@@ -150,21 +151,24 @@ def brief():
         ], [1000, 3500, 2526, 2000]),
 
         heading("Architecture"),
-        picture(ROOT / "docs" / "architecture.png", max_h_cm=12),
-        para("*Figure 1. Request flow (1 to 6), IAM/security and how the stack is deployed.*"),
-        para("**Request flow:** the device sends the photo (base64 JPEG) over HTTPS to API Gateway, which invokes "
-             "Lambda. The function processes the image (calling Textract in text mode), saves the scan in "
-             "DynamoDB and returns the pins or braille for the display."),
-        para("**IAM:** the Lambda role can only do CRUD on this one table, call textract:DetectDocumentText and write its "
-             "own logs. Only this API may invoke the function, and I deploy with an IAM user, not root."),
-        para("**Network and privacy:** no VPC, HTTPS only, DynamoDB encrypted at rest. Photos may show private "
-             "documents, so they are processed in memory and never saved. Device login (a Lambda authorizer) comes later."),
+        picture(ROOT / "docs" / "architecture_figma.png", max_h_cm=9),
+        para("*Figure 1. Request flow (steps 1 to 6) and how the stack is deployed.*"),
+        para("**How a request flows.** The device sends the photo as a base64 JPEG over HTTPS to API Gateway, which "
+             "invokes the Lambda function. Lambda processes the image (in text mode it also calls Textract), saves "
+             "the scan to DynamoDB and sends the pins or braille back to the display."),
+        para("**Permissions.** The Lambda role can only read and write this one table, call "
+             "textract:DetectDocumentText and write its own logs. Only this API can invoke the function, and I "
+             "deploy with an IAM user, never the root account."),
+        para("**Network and privacy.** There's no VPC, everything goes over HTTPS and DynamoDB encrypts data at rest. "
+             "Photos can show private documents, so they're processed in memory and never stored. Device login "
+             "(a Lambda authorizer) is planned for later."),
 
         heading("Environment and status"),
-        para("Repo: https://github.com/FachryAlfareeza/brailliant-scan. The course's AWS Academy lab doesn't "
-             "allow Lambda, DynamoDB or API Gateway, so I deployed the same code as an **ECS Fargate container** "
-             "storing scans in **S3**; all 9 API tests pass on AWS. The *Ideal plan vs lab implementation* "
-             "document explains each difference. **Next:** S3 upload, device login, Polly, Grade 2 braille."),
+        para("The code is at https://github.com/FachryAlfareeza/brailliant-scan. The course's AWS Academy lab "
+             "doesn't allow Lambda, DynamoDB or API Gateway, so I ran the same code there as an **ECS Fargate "
+             "container** that keeps scans in **S3**. All 9 API tests pass on AWS, and the *Ideal plan vs lab "
+             "implementation* document covers each difference. Next: S3 photo upload, device login, Polly and "
+             "Grade 2 braille."),
     ]
 
 
@@ -172,14 +176,14 @@ def brief():
 def implementation():
     return [
         heading("Ideal plan vs lab implementation"),
-        para("The design (template.yaml) uses API Gateway, Lambda and DynamoDB. The AWS Academy lab I was given "
-             "is set up for a containers exercise, so I checked what it allows with the IAM policy simulator "
-             "(aws iam simulate-principal-policy) and used the closest services it permits, as the lecturer asked. "
-             "The app code (app.py), the ScanJob entity, the endpoints and the tests are the same in both, and "
-             "on the full Learner Lab scripts/deploy.sh still deploys the ideal version unchanged."),
-        picture(ROOT / "docs" / "architecture_figma.png", max_h_cm=8),
-        para("*Figure 1. The ideal plan from the design brief. The tables below show what the lab "
-             "version changes and why.*"),
+        para("My design (template.yaml) uses API Gateway, Lambda and DynamoDB. The AWS Academy lab I was given is "
+             "set up for a containers exercise, so I first checked what it lets me do with the IAM policy simulator "
+             "(aws iam simulate-principal-policy). Then, as the lecturer asked, I swapped in the closest services it "
+             "does allow. The app code (app.py), the ScanJob entity, the endpoints and the tests didn't change. On "
+             "the full Learner Lab, scripts/deploy.sh still deploys the ideal version."),
+        picture(ROOT / "docs" / "architecture_figma.png", max_h_cm=7),
+        para("*Figure 1. The ideal plan from the design brief. The tables below show what I changed for the lab "
+             "and why.*"),
         table(["Allowed in the lab", "Not allowed in the lab"], [
             ["ECS (Fargate), ECR, S3 buckets, load balancers, security groups, CloudWatch Logs (through the "
              "container), Rekognition and Polly (my login only), CodeCommit / CodePipeline, Cloud9",
@@ -190,86 +194,90 @@ def implementation():
         heading("What changed and why"),
         table(["Ideal plan", "In the lab", "Why"], [
             ["API Gateway (HTTP API)", "The container serves HTTP itself on a public IP (port 8080)",
-             "API Gateway is blocked. A load balancer is allowed but costs about $0.0225/hour even when idle; "
-             "a public IP is about $0.005/hour and only while the container runs. "
-             "The cost: the address changes when the container restarts."],
-            ["HTTPS, throttled to 10 requests/s", "Plain HTTP on port 8080, open to the internet, no throttling",
-             "HTTPS needs a certificate on a load balancer or API Gateway. Fine for sample photos; real "
-             "device photos must not go over this."],
+             "API Gateway is blocked. A load balancer would work, but it costs about $0.0225/hour even when idle. "
+             "A public IP is about $0.005/hour and only while the container runs. The downside is that the "
+             "address changes every time the container restarts."],
+            ["HTTPS, limited to 10 requests/s", "Plain HTTP on port 8080, open to the internet, no limit",
+             "HTTPS needs a certificate on a load balancer or API Gateway. Fine for sample photos, not for "
+             "real ones."],
             ["Lambda + Pillow layer", "ECS Fargate container (image in ECR) running the same app.py, with a "
              "small web server (server.py) in front",
-             "Lambda is blocked, ECS is what the lab is for. server.py turns each request into the same event "
-             "API Gateway would send, so the code is unchanged."],
-            ["DynamoDB (on-demand)", "S3 bucket, each scan is one JSON file (s3_table.py)",
-             "DynamoDB is blocked. S3 is also billed per request, so the cost rule still holds. Listing all "
-             "scans is slower than a DynamoDB scan, fine at this size."],
+             "Lambda is blocked; ECS is what the lab is for. server.py builds the same event API Gateway would "
+             "send, so app.py is unchanged."],
+            ["DynamoDB (on-demand)", "S3 bucket, one JSON file per scan (s3_table.py)",
+             "DynamoDB is blocked. S3 also charges per request, so the cost rule holds. Listing scans is "
+             "slower, which is fine at this size."],
             ["Own least-privilege role", "The lab's PipelineRole",
-             "Creating roles is blocked and PipelineRole is the only role a container may use. It is broader "
-             "than I want (full S3 access)."],
-            ["Textract OCR", "OCR off, typed text still becomes braille",
-             "No role a container can use may call Textract or Rekognition. Graph mode, the main feature, "
-             "works fully."],
+             "I can't create roles, and it's the only role a container may use. It allows more than I'd like "
+             "(full S3)."],
+            ["Textract OCR", "OCR turned off; typed text still becomes braille",
+             "None of the roles a container can use may call Textract or Rekognition. Graph mode, the main "
+             "feature, works fully."],
             ["SAM / CloudFormation", "AWS CLI script (scripts/lab_deploy.sh)",
              "Change sets and S3 uploads from my login are blocked, so sam deploy can't run."],
-            ["AWS Budgets", "None", "Blocked. The lab credit limit works as the cap."],
+            ["AWS Budgets", "None", "Blocked. The lab's credit limit acts as the cap instead."],
         ], [1900, 3063, 4063]),
 
         heading("Cost difference"),
-        para("The ideal plan bills only per request, nothing while idle. **Fargate is the exception**: it bills "
-             "per second while the container runs: the smallest size (0.25 vCPU / 512 MB) is about $0.012 per hour, "
-             "plus about $0.005 per hour for the public IP, so about $0.40 a day if I forgot to stop it "
-             "(us-east-1 prices). To keep that small, scripts/lab_stop.sh sets the service to 0 containers when I'm not "
-             "testing (the scans stay in S3), and lab_start.sh starts it again. S3 and CloudWatch Logs are billed "
-             "per request / per GB, the same as the ideal plan."),
+        para("The ideal plan only charges per request, so it costs nothing while idle. **Fargate is the exception.** "
+             "It charges by the second while the container runs. The smallest size (0.25 vCPU / 512 MB) is about "
+             "$0.012 an hour, and the public IP adds about $0.005, so leaving it on by mistake would cost around "
+             "$0.40 a day (us-east-1 prices). That's why scripts/lab_stop.sh scales the service down to 0 when I'm "
+             "not testing (the scans stay in S3) and lab_start.sh brings it back. S3 and CloudWatch Logs are "
+             "charged per request and per GB, the same as in the ideal plan."),
 
         heading("What I checked on AWS"),
-        bullet("scripts/lab_deploy.sh created the bucket, the ECR image, the security group, the cluster, the "
-               "task definition and the service, and the container started with a public IP."),
-        bullet("scripts/test_api.sh against the public URL: health check (it reports the S3 bucket), create, bad "
-               "input, read, list, update, delete and read-after-delete. All 9 checks pass "
-               "(evidence/test_api_output_aws.txt). The scans are JSON files under scans/ in the bucket, and "
-               "every request is logged in CloudWatch (/ecs/brailliant-scan)."),
-        bullet("scripts/device_sim.py sent the sample graph photo and got back the 96 x 64 pin grid (401 raised "
-               "pins), the same result as locally."),
-
+        bullet("scripts/lab_deploy.sh created the bucket, pushed the image to ECR, and set up the security group, "
+               "cluster, task definition and service. The container started with a public IP."),
+        bullet("I ran scripts/test_api.sh against the public URL. It covers the health check (which reports the S3 "
+               "bucket), create, bad input, read, list, update, delete and read-after-delete, and all 9 checks "
+               "passed (evidence/test_api_output_aws.txt). Scans show up as JSON files in the bucket and requests "
+               "in CloudWatch."),
+        bullet("scripts/device_sim.py sent the sample graph photo and got the 96 x 64 pin grid back with 401 raised "
+               "pins, same as locally."),
     ]
 
 
 # ---------------- evidence ----------------
 SHOTS = [
     ("L1_docker_containers.png", "L1. Docker containers",
-     "kompaw-dynamodb is DynamoDB Local (port 8010). The other container is the Lambda runtime "
-     "(Python 3.13 with the Pillow layer) that SAM starts."),
+     "kompaw-dynamodb is DynamoDB Local on port 8010. The other container is the Lambda runtime "
+     "(Python 3.13 with the Pillow layer), which SAM starts on its own."),
     ("L2_sam_build_and_start.png", "L2. sam build and sam local start-api",
-     "template.yaml is valid and builds, and SAM starts the Lambda runtime with the Pillow layer. The API then runs on http://127.0.0.1:3000 (requests in L7)."),
+     "template.yaml is valid and builds, and SAM starts the Lambda runtime with the Pillow layer. After that the "
+     "API runs on http://127.0.0.1:3000 (the requests are in L7)."),
     ("L3_api_test_pass.png", "L3. API test",
-     "scripts/test_api.sh: health check, create (graph photo and text), bad input, read, list, update, delete "
-     "and read-after-delete. All 9 checks pass. Full output in evidence/test_api_output.txt."),
+     "scripts/test_api.sh runs the health check, creates a graph scan and a text scan, sends bad input, then "
+     "reads, lists, updates and deletes, and reads again after deleting. All 9 checks pass. The full output is "
+     "in evidence/test_api_output.txt."),
     ("L4_device_sim_graph.png", "L4. Device simulator, graph mode",
-     "scripts/device_sim.py sends data/samples/graph.png like the device would. The returned 96 x 64 pin grid "
-     "is printed with braille characters (each character is 2 x 4 pins)."),
-    ("L5_graph_to_pins.png", "L5. Photo and the pins it becomes",
-     "Left: the photo that was sent. Right: the 96 x 64 grid from the Lambda, white dots are raised pins."),
+     "scripts/device_sim.py sends data/samples/graph.png the way the device would. It prints the 96 x 64 pin "
+     "grid it gets back using braille characters, where each character covers 2 x 4 pins."),
+    ("L5_graph_to_pins.png", "L5. The photo and the pins it turns into",
+     "On the left is the photo that was sent. On the right is the 96 x 64 grid from Lambda, where the white "
+     "dots are raised pins."),
     ("L6_dynamodb_scans.png", "L6. Scans stored in DynamoDB",
-     "Number of scan jobs saved in the brailliant-scans table after the API test and the simulator run."),
+     "The number of scan jobs in the brailliant-scans table after running the API test and the simulator."),
     ("L7_lambda_logs.png", "L7. Lambda logs",
-     "START / END / REPORT lines for each request, with duration and memory."),
+     "A START, END and REPORT line for each request, showing how long it took and how much memory it used."),
 ]
 
 AWS_SHOTS = [
     ("A1_ecs_service.png", "A1. ECS service running",
-     "brailliant-cluster / brailliant-scan-service in the ECS console with 1 running task (Fargate)."),
+     "brailliant-cluster / brailliant-scan-service in the ECS console, with 1 Fargate task running."),
     ("A2_ecs_task.png", "A2. The running container",
-     "Task details: brailliant-scan task definition, PipelineRole, and the public IP the API is reached on."),
+     "The task details: the brailliant-scan task definition, PipelineRole, and the public IP I used to reach "
+     "the API."),
     ("A3_ecr_image.png", "A3. Container image in ECR",
-     "The brailliant-scan repository with the image built and pushed by scripts/lab_deploy.sh."),
+     "The brailliant-scan repository, holding the image that scripts/lab_deploy.sh built and pushed."),
     ("A4_s3_scans.png", "A4. Scans stored in S3",
-     "The scans/ folder in the bucket, one JSON file per scan job (S3 instead of DynamoDB in the lab)."),
+     "The scans/ folder in the bucket, with one JSON file per scan job. In the lab, S3 takes the place of "
+     "DynamoDB."),
     ("A5_cloudwatch_logs.png", "A5. Container logs in CloudWatch",
-     "Log group /ecs/brailliant-scan with a START / END line for each request."),
+     "The /ecs/brailliant-scan log group, with a START and END line for each request."),
     ("A6_live_api_test.png", "A6. API test against AWS",
-     "scripts/test_api.sh against the container's public IP. All 9 checks pass "
-     "(full output in evidence/test_api_output_aws.txt)."),
+     "scripts/test_api.sh run against the container's public IP. All 9 checks pass (the full output is in "
+     "evidence/test_api_output_aws.txt)."),
     ("A7_live_device_sim.png", "A7. Device simulator against AWS",
      "A graph photo sent to the AWS deployment comes back as the 96 x 64 pin grid."),
 ]
@@ -279,10 +287,11 @@ def evidence():
     ev = ROOT / "evidence"
     body = [
         heading("Week 12 evidence"),
-        para("**Part A** is the deployment in the AWS Academy lab (ECS Fargate + S3, see the *Ideal plan vs lab "
-             "implementation* document for why). **Part L** is the ideal version (Lambda + API Gateway + DynamoDB "
-             "from template.yaml) tested locally with AWS SAM CLI and DynamoDB Local, because the lab doesn't "
-             "allow those services. OCR (Textract) isn't shown: it's blocked in the lab and can't run locally."),
+        para("**Part A** shows the deployment in the AWS Academy lab, which runs on ECS Fargate and S3 (the *Ideal "
+             "plan vs lab implementation* document explains why). **Part L** shows the ideal version (Lambda, API "
+             "Gateway and DynamoDB from template.yaml) tested on my laptop with AWS SAM CLI and DynamoDB Local, "
+             "since the lab doesn't allow those services. OCR with Textract isn't shown, because the lab blocks it "
+             "and it can't run locally."),
     ]
     if any((ev / shot[0]).exists() for shot in AWS_SHOTS):
         body.append(heading("Part A: AWS Academy lab (ECS Fargate + S3)"))
@@ -303,8 +312,9 @@ def evidence():
     if email.exists():
         import pypdfium2 as pdfium
         body += [page_break(), heading("L8. AWS suspension email (personal account)"),
-                 para("My personal AWS account was suspended on 24 Nov for identity verification, which is why I "
-                      "first tested everything locally. I blacked out my email, the account ID and the upload link.",
+                 para("AWS suspended my personal account on 24 Nov for identity verification, which is why I "
+                      "tested everything locally first. My email, the account ID and the upload link are "
+                      "blacked out.",
                       keep_next=True)]
         pdf = pdfium.PdfDocument(email)
         for i in range(min(2, len(pdf))):
