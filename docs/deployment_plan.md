@@ -21,8 +21,9 @@
 `bash scripts/deploy.sh` builds the layer, runs `sam build` and `sam deploy`, and saves the API URL.
 Running it again only updates what changed.
 
-On AWS Academy Learner Lab, SAM can't create the role, so the function would need
-`Role: arn:aws:iam::<account>:role/LabRole` instead of `Policies`.
+On AWS Academy Learner Lab, roles and budgets can't be created. `deploy.sh` notices the
+`voclabs` login and passes `LabRoleArn` (the lab's ready-made LabRole) instead, and skips the budget.
+If Textract isn't allowed in the lab, deploy with `OCR=false bash scripts/deploy.sh`.
 
 ## How I check it works
 

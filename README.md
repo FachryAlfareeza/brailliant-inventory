@@ -77,6 +77,8 @@ BUDGET_EMAIL=me@example.com bash scripts/deploy.sh
 bash scripts/test_api.sh
 bash scripts/teardown.sh      # deletes the whole stack
 ```
+On AWS Academy Learner Lab: paste the lab's CLI credentials into `~/.aws/credentials` and run
+`bash scripts/deploy.sh`. It detects the lab and uses `LabRole` (the lab can't create roles).
 
 ## Documents
 

@@ -14,9 +14,15 @@ Parameters:
     Type: String
     Default: ""
     Description: email for the $1/month budget alert (leave empty to skip)
+  LabRoleArn:
+    Type: String
+    Default: ""
+    Description: AWS Academy Learner Lab can't create roles, so pass LabRole's ARN there
 
 Conditions:
   HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, ""]]
+  UseLabRole: !Not [!Equals [!Ref LabRoleArn, ""]]
+  CreateOwnRole: !Equals [!Ref LabRoleArn, ""]
 
 Globals:
   Function:
@@ -68,21 +74,7 @@ Resources:
           TABLE_NAME: !Ref ScansTable
           OCR_ENABLED: !Ref OcrEnabled
           DYNAMODB_ENDPOINT: ""   # set in scripts/local_env.json for local testing
-      # only CRUD on this table + Textract OCR (SAM adds the CloudWatch Logs permissions)
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-                - dynamodb:Scan
-                - dynamodb:DescribeTable
-              Resource: !GetAtt ScansTable.Arn
-            - Effect: Allow
-              Action: textract:DetectDocumentText
-              Resource: "*"
+      Role: !If [UseLabRole, !Ref LabRoleArn, !GetAtt ScanFunctionRole.Arn]
       Events:
         CreateScan: { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: POST,   Path: /scans } }
         ListScans:  { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: GET,    Path: /scans } }
@@ -92,6 +84,40 @@ Resources:
         Health:     { Type: HttpApi, Properties: { ApiId: !Ref ScanApi, Method: GET,    Path: /health } }
       Tags:
         Project: brailliant
+
+  # least-privilege role, only made on a normal account (not on Learner Lab)
+  ScanFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateOwnRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: scan-function
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                  - dynamodb:DescribeTable
+                Resource: !GetAtt ScansTable.Arn
+              - Effect: Allow
+                Action: textract:DetectDocumentText
+                Resource: "*"
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/brailliant-scan-api:*
+      Tags:
+        - { Key: Project, Value: brailliant }
 
   ScanFunctionLogs:
     Type: AWS::Logs::LogGroup
