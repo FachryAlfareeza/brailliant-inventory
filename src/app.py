@@ -290,7 +290,8 @@ def delete_scan(scan_id):
 
 def health():
     info = table().meta.client.describe_table(TableName=TABLE_NAME)["Table"]
-    return respond(200, {"status": "ok", "table": TABLE_NAME, "tableStatus": info["TableStatus"],
+    where = f"s3://{BUCKET}" if STORAGE == "s3" else f"dynamodb:{TABLE_NAME}"
+    return respond(200, {"status": "ok", "storage": where, "storageStatus": info["TableStatus"],
                          "ocr": OCR_ENABLED, "time": now()})
 
 

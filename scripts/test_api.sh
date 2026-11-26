@@ -49,7 +49,7 @@ scan_id() { head -n1 <<<"$RES" | $PY -c "import json,sys; print(json.load(sys.st
   echo "API test - $URL - $(date '+%Y-%m-%d %H:%M:%S')"
   echo
 
-  echo "# health check (API -> Lambda -> DynamoDB)"
+  echo "# health check (API -> code -> storage)"
   check 200 GET /health
 
   echo "# create: graph photo -> 96 x 64 pins"
