@@ -177,9 +177,9 @@ def implementation():
              "(aws iam simulate-principal-policy) and used the closest services it permits, as the lecturer asked. "
              "The app code (app.py), the ScanJob entity, the endpoints and the tests are the same in both, and "
              "on the full Learner Lab scripts/deploy.sh still deploys the ideal version unchanged."),
-        picture(ROOT / "docs" / "architecture_lab.png", max_h_cm=8),
-        para("*Figure 2. The lab version. Grey notes show what each part replaces in the ideal plan "
-             "(Figure 1 in the design brief).*"),
+        picture(ROOT / "docs" / "architecture_figma.png", max_h_cm=8),
+        para("*Figure 1. The ideal plan from the design brief. The tables below show what the lab "
+             "version changes and why.*"),
         table(["Allowed in the lab", "Not allowed in the lab"], [
             ["ECS (Fargate), ECR, S3 buckets, load balancers, security groups, CloudWatch Logs (through the "
              "container), Rekognition and Polly (my login only), CodeCommit / CodePipeline, Cloud9",
