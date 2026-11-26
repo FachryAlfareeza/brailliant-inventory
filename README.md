@@ -22,10 +22,15 @@ label or delete it later. Photos themselves are not stored.
 
 ## Status
 
-My AWS accounts (personal and AWS Academy) were suspended on 24 Nov 2026, so I couldn't
-deploy yet. I ran the same template locally with AWS SAM CLI and DynamoDB Local instead.
-All API tests pass and graph mode works. OCR needs Textract, so text mode from a
-photo only works on AWS (text sent directly still becomes braille locally).
+- **Deployed on AWS (26 Nov 2026)** in the course's AWS Academy lab. That lab only allows
+  containers and S3, so it runs as an ECS Fargate container that stores scans in S3 (see the
+  next section and `docs/lab_implementation.docx`). All 9 API tests pass against it, and graph
+  mode turns photos into the 96 x 64 pin grid.
+- **The ideal version** (Lambda + API Gateway + DynamoDB, `template.yaml`) is tested locally with
+  AWS SAM CLI and DynamoDB Local. My personal AWS account was suspended on 24 Nov, and the lab
+  doesn't allow those services.
+- **OCR (Textract)** isn't shown anywhere yet: the lab blocks it and it can't run locally.
+  Text sent directly still becomes braille.
 
 ## AWS Academy lab version (what actually runs on AWS)
 
