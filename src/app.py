@@ -4,7 +4,8 @@
 #   graph -> edge detection, scaled down to the 96 x 64 pin display (1 = raised pin)
 #   text  -> OCR (Amazon Textract, only on AWS) and then Grade 1 braille
 # Every scan is saved as a "scan job" in DynamoDB so the device (or an app)
-# can fetch, label or delete it later.
+# can fetch, label or delete it later. In the AWS Academy lab, where DynamoDB
+# isn't allowed, STORAGE=s3 saves the jobs as JSON files in S3 instead.
 import base64
 import binascii
 import io
@@ -21,6 +22,8 @@ from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 TABLE_NAME = os.environ.get("TABLE_NAME", "brailliant-scans")
 DYNAMODB_ENDPOINT = os.environ.get("DYNAMODB_ENDPOINT", "")    # only for local testing
 OCR_ENABLED = os.environ.get("OCR_ENABLED", "true") == "true"  # Textract can't run locally
+STORAGE = os.environ.get("STORAGE", "dynamodb")                # "s3" in the AWS Academy lab
+BUCKET = os.environ.get("BUCKET", "")
 
 GRID_W, GRID_H = 96, 64          # the BrAIlliant pin display
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
@@ -33,6 +36,10 @@ _textract = None
 def table():
     global _table
     if _table is None:
+        if STORAGE == "s3":
+            from s3_table import S3Table
+            _table = S3Table(boto3.client("s3"), BUCKET)
+            return _table
         if DYNAMODB_ENDPOINT:
             db = boto3.resource("dynamodb", endpoint_url=DYNAMODB_ENDPOINT,
                                 region_name=os.environ.get("AWS_REGION", "us-east-1"),
