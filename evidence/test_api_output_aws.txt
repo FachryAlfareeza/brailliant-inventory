@@ -2,7 +2,7 @@ API test - http://44.203.99.127:8080 - 2026-11-26 12:55:38
 
 # health check (API -> code -> storage)
 $ curl -X GET http://44.203.99.127:8080/health 
-{"status": "ok", "storage": "s3://brailliant-scans-402337830412", "storageStatus": "ACTIVE", "ocr": false, "time": "2026-11-26T05:55:39+00:00"}
+{"status": "ok", "storage": "s3://brailliant-scans-<account>", "storageStatus": "ACTIVE", "ocr": false, "time": "2026-11-26T05:55:39+00:00"}
 PASS
 
 # create: graph photo -> 96 x 64 pins
