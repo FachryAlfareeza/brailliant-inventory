@@ -161,7 +161,7 @@ def brief():
              "documents, so they are processed in memory and never saved. Device login (a Lambda authorizer) comes later."),
 
         heading("Environment and status"),
-        para("Repo: https://github.com/FachryAlfareeza/brailliant-inventory. The course's AWS Academy lab doesn't "
+        para("Repo: https://github.com/FachryAlfareeza/brailliant-scan. The course's AWS Academy lab doesn't "
              "allow Lambda, DynamoDB or API Gateway, so I deployed the same code as an **ECS Fargate container** "
              "storing scans in **S3**; all 9 API tests pass on AWS. The *Ideal plan vs lab implementation* "
              "document explains each difference. **Next:** S3 upload, device login, Polly, Grade 2 braille."),
