@@ -11,7 +11,7 @@ if [[ -z "$URL" ]]; then
   echo "No URL given and no deploy found. Run scripts/deploy.sh or pass the URL."
   exit 1
 fi
-OUT="evidence/test_api_output.txt"
+OUT="${OUT:-evidence/test_api_output.txt}"   # OUT=... saves it somewhere else
 FAILED=0
 mkdir -p build
 

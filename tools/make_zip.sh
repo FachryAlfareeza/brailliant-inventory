@@ -9,6 +9,7 @@ mkdir -p submission
 git archive --format=zip --prefix=$NAME/ -o submission/$NAME.zip HEAD
 cp docs/design_brief.pdf submission/${NAME}_DesignBrief.pdf
 cp docs/design_brief.docx submission/${NAME}_DesignBrief.docx
+[[ -f docs/lab_implementation.pdf ]] && cp docs/lab_implementation.pdf submission/${NAME}_LabImplementation.pdf
 [[ -f evidence/evidence.docx ]] && cp evidence/evidence.docx submission/${NAME}_Evidence.docx
 [[ -f evidence/evidence.pdf ]] && cp evidence/evidence.pdf submission/${NAME}_Evidence.pdf
 true

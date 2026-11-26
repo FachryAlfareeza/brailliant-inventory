@@ -27,10 +27,28 @@ deploy yet. I ran the same template locally with AWS SAM CLI and DynamoDB Local 
 All API tests pass and graph mode works. OCR needs Textract, so text mode from a
 photo only works on AWS (text sent directly still becomes braille locally).
 
+## AWS Academy lab version (what actually runs on AWS)
+
+The course's lab only allows containers (ECS, ECR) and S3, not Lambda, API Gateway or DynamoDB.
+So the same `app.py` also runs as an **ECS Fargate container** (`Dockerfile`, `src/server.py`)
+that stores scans in **S3** (`src/s3_table.py`). The differences and the reasons are in
+`docs/lab_implementation.docx` (and `docs/architecture_lab.png`).
+
+```bash
+bash scripts/lab_deploy.sh     # build + push the image, create bucket, cluster, service; prints the URL
+bash scripts/test_api.sh       # against the container's public IP
+bash scripts/lab_stop.sh       # 0 containers = no Fargate charges (scans stay in S3)
+bash scripts/lab_start.sh      # start again (new IP)
+bash scripts/lab_teardown.sh   # delete everything
+```
+
 ## Folders
 
 ```
 src/app.py          the Lambda function (image processing, braille, CRUD)
+src/server.py       runs app.py as a web server in a container (lab version)
+src/s3_table.py     S3 storage with the same interface as the DynamoDB table (lab version)
+Dockerfile          container image for ECS Fargate (lab version)
 tests/              unit tests, use a fake table so they run without AWS
 template.yaml       SAM template (table, Pillow layer, function, role, API, budget)
 scripts/            deploy / teardown, local run, API test, device simulator

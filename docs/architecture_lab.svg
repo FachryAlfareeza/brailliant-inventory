@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+    <style>
+      .t{font-size:15px;font-weight:700;fill:#111827}
+      .s{font-size:12px;fill:#374151}
+      .x{font-size:11px;fill:#4b5563}
+      .lbl{font-size:12px;fill:#111827;font-weight:600}
+      .red{font-size:12px;fill:#b91c1c;font-weight:600}
+      .grey{font-size:11px;fill:#9ca3af}
+    </style>
+  </defs>
+  <rect width="1200" height="560" fill="#ffffff"/>
+  <text x="30" y="38" font-size="22" font-weight="700" fill="#111827">BrAIlliant Scan API: AWS Academy lab version</text>
+  <text x="30" y="60" class="s">The lab only allows containers, so the same code runs on ECS Fargate and stores scans in S3 (ideal: Lambda + API Gateway + DynamoDB)</text>
+
+  <!-- device -->
+  <rect x="30" y="130" width="190" height="170" rx="10" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.6"/>
+  <text x="125" y="156" text-anchor="middle" class="t">BrAIlliant device</text>
+  <text x="125" y="176" text-anchor="middle" class="s">(scripts/device_sim.py,</text>
+  <text x="125" y="192" text-anchor="middle" class="s">scripts/test_api.sh)</text>
+  <text x="44" y="222" class="x">sends a photo (graph mode)</text>
+  <text x="44" y="238" class="x">or text, gets back the</text>
+  <text x="44" y="254" class="x">96 x 64 pins / braille</text>
+  <text x="125" y="286" text-anchor="middle" class="grey">ideal: via API Gateway</text>
+
+  <!-- cloud -->
+  <rect x="260" y="90" width="910" height="330" rx="14" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="280" y="114" font-size="14" font-weight="700" fill="#b45309">AWS Academy lab account (us-east-1), LabVPC public subnet</text>
+
+  <!-- fargate -->
+  <rect x="300" y="130" width="330" height="190" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
+  <text x="465" y="156" text-anchor="middle" class="t">ECS Fargate task (1 container)</text>
+  <text x="465" y="174" text-anchor="middle" class="s">brailliant-cluster / brailliant-scan-service</text>
+  <text x="316" y="202" class="lbl">server.py</text>
+  <text x="400" y="202" class="x">HTTP on port 8080 (public IP),</text>
+  <text x="400" y="216" class="x">makes an API-Gateway-style event</text>
+  <text x="316" y="242" class="lbl">app.py</text>
+  <text x="400" y="242" class="x">same code as the Lambda version:</text>
+  <text x="400" y="256" class="x">edges -> 96 x 64 pins, braille, CRUD</text>
+  <text x="316" y="282" class="lbl">s3_table.py</text>
+  <text x="400" y="282" class="x">saves scan jobs in S3</text>
+  <text x="465" y="308" text-anchor="middle" class="grey">ideal: Lambda + Pillow layer</text>
+
+  <!-- S3 -->
+  <rect x="720" y="130" width="230" height="130" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+  <text x="835" y="156" text-anchor="middle" class="t">Amazon S3</text>
+  <text x="835" y="176" text-anchor="middle" class="s">brailliant-scans-&lt;account&gt;</text>
+  <text x="835" y="200" text-anchor="middle" class="x">scans/&lt;scanId&gt;.json</text>
+  <text x="835" y="216" text-anchor="middle" class="x">billed per request + storage</text>
+  <text x="835" y="246" text-anchor="middle" class="grey">ideal: DynamoDB on-demand</text>
+
+  <!-- ECR -->
+  <rect x="990" y="130" width="160" height="100" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+  <text x="1070" y="156" text-anchor="middle" class="t">Amazon ECR</text>
+  <text x="1070" y="176" text-anchor="middle" class="s">brailliant-scan</text>
+  <text x="1070" y="196" text-anchor="middle" class="x">container image</text>
+  <text x="1070" y="216" text-anchor="middle" class="x">(Python + Pillow)</text>
+
+  <!-- logs -->
+  <rect x="720" y="300" width="230" height="80" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
+  <text x="835" y="328" text-anchor="middle" class="t">CloudWatch Logs</text>
+  <text x="835" y="348" text-anchor="middle" class="x">/ecs/brailliant-scan</text>
+  <text x="835" y="364" text-anchor="middle" class="x">START / END per request</text>
+
+  <!-- IAM -->
+  <rect x="300" y="340" width="330" height="66" rx="10" fill="#fef2f2" stroke="#b91c1c" stroke-width="1.4"/>
+  <text x="314" y="362" class="red">IAM / security</text>
+  <text x="314" y="380" class="x">PipelineRole (lab role): pull image, write logs, S3 access</text>
+  <text x="314" y="396" class="x">security group: only port 8080 open. OCR off (no permission)</text>
+
+  <!-- arrows -->
+  <line x1="220" y1="200" x2="296" y2="200" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="226" y="190" class="lbl">1 HTTP</text>
+  <line x1="296" y1="250" x2="224" y2="250" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="226" y="270" class="lbl">4 pins</text>
+  <line x1="630" y1="185" x2="716" y2="185" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="640" y="176" class="lbl">2 save</text>
+  <line x1="716" y1="230" x2="634" y2="230" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="640" y="248" class="lbl">3 read</text>
+  <line x1="630" y1="300" x2="716" y2="330" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="652" y="300" class="x">logs</text>
+  <path d="M 1070 130 L 1070 122 L 560 122 L 560 128" fill="none" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrG)"/>
+  <text x="900" y="117" class="x">image pulled at start</text>
+
+  <!-- deploy -->
+  <rect x="30" y="450" width="1140" height="90" rx="12" fill="#f9fafb" stroke="#9ca3af"/>
+  <text x="50" y="476" class="t">How it gets deployed: scripts/lab_deploy.sh (AWS CLI + Docker, no CloudFormation in this lab)</text>
+  <text x="50" y="500" class="x">docker build + push to ECR  -&gt;  S3 bucket  -&gt;  security group (port 8080)  -&gt;  ECS cluster  -&gt;  task definition (0.25 vCPU, 512 MB, PipelineRole)  -&gt;  service with a public IP</text>
+  <text x="50" y="520" class="x">Fargate bills per second while running, so scripts/lab_stop.sh scales it to 0 when not in use (scans stay in S3). scripts/lab_teardown.sh deletes everything.</text>
+</svg>

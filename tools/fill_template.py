@@ -3,6 +3,7 @@
 # and the body are replaced.
 #   python tools/fill_template.py brief      -> docs/design_brief.docx
 #   python tools/fill_template.py evidence   -> evidence/evidence.docx
+#   python tools/fill_template.py implementation -> docs/lab_implementation.docx
 # Export to PDF from Word afterwards (File > Save As > PDF), or run tools/export_pdf.ps1.
 import re
 import sys
@@ -160,11 +161,73 @@ def brief():
              "documents, so they are processed in memory and never saved. Device login (a Lambda authorizer) comes later."),
 
         heading("Environment and status"),
-        para("Repo: https://github.com/FachryAlfareeza/brailliant-inventory (Lambda code, unit tests, SAM template, "
-             "deploy script, API test script, device simulator). My AWS accounts were suspended on 24 Nov, so I "
-             "tested locally with AWS SAM CLI and DynamoDB Local: all 9 API tests pass, and a sample graph photo "
-             "becomes a 96 x 64 pin picture (see the evidence). OCR needs Textract, so it only works once "
-             "deployed. **Next:** sam deploy, S3 upload, device login, Polly audio, Grade 2 braille (Liblouis)."),
+        para("Repo: https://github.com/FachryAlfareeza/brailliant-inventory. The course's AWS Academy lab doesn't "
+             "allow Lambda, DynamoDB or API Gateway, so I deployed the same code as an **ECS Fargate container** "
+             "storing scans in **S3**; all 9 API tests pass on AWS. The *Ideal plan vs lab implementation* "
+             "document explains each difference. **Next:** S3 upload, device login, Polly, Grade 2 braille."),
+    ]
+
+
+# ---------------- ideal plan vs lab implementation ----------------
+def implementation():
+    return [
+        heading("Ideal plan vs lab implementation"),
+        para("The design (template.yaml) uses API Gateway, Lambda and DynamoDB. The AWS Academy lab I was given "
+             "is set up for a containers exercise, so I checked what it allows with the IAM policy simulator "
+             "(aws iam simulate-principal-policy) and used the closest services it permits, as the lecturer asked."),
+        picture(ROOT / "docs" / "architecture_lab.png", max_h_cm=9),
+        para("*Figure 2. The lab version. Grey notes show what each part replaces in the ideal plan (Figure 1).*"),
+        table(["Allowed in the lab", "Not allowed in the lab"], [
+            ["ECS (Fargate), ECR, S3 buckets, load balancers, security groups, CloudWatch Logs (through the "
+             "container), Rekognition and Polly (my login only), CodeCommit / CodePipeline, Cloud9",
+             "Lambda, API Gateway, DynamoDB, Textract, CloudFormation change sets, uploading to S3 from my login, "
+             "creating IAM roles, AWS Budgets, SQS / SNS, Secrets Manager, Cognito"],
+        ], [4513, 4513]),
+
+        heading("What changed and why"),
+        table(["Ideal plan", "In the lab", "Why"], [
+            ["API Gateway (HTTP API)", "The container serves HTTP itself on a public IP (port 8080)",
+             "API Gateway is blocked. A load balancer is allowed but is billed per hour, a public IP is free. "
+             "The cost: the address changes when the container restarts."],
+            ["Lambda + Pillow layer", "ECS Fargate container (image in ECR) running the same app.py, with a "
+             "small web server (server.py) in front",
+             "Lambda is blocked, ECS is what the lab is for. server.py turns each request into the same event "
+             "API Gateway would send, so the code is unchanged."],
+            ["DynamoDB (on-demand)", "S3 bucket, each scan is one JSON file (s3_table.py)",
+             "DynamoDB is blocked. S3 is also billed per request, so the cost rule still holds. Listing all "
+             "scans is slower than a DynamoDB scan, fine at this size."],
+            ["Own least-privilege role", "The lab's PipelineRole",
+             "Creating roles is blocked and PipelineRole is the only role a container may use. It is broader "
+             "than I want (full S3 access)."],
+            ["Textract OCR", "OCR off, typed text still becomes braille",
+             "No role a container can use may call Textract or Rekognition. Graph mode, the main feature, "
+             "works fully."],
+            ["SAM / CloudFormation", "AWS CLI script (scripts/lab_deploy.sh)",
+             "Change sets and S3 uploads from my login are blocked, so sam deploy can't run."],
+            ["AWS Budgets", "None", "Blocked. The lab credit limit works as the cap."],
+        ], [1900, 3063, 4063]),
+
+        heading("Cost difference"),
+        para("The ideal plan bills only per request, nothing while idle. **Fargate is the exception**: it bills "
+             "per second while the container runs (smallest size, 0.25 vCPU / 512 MB, roughly $0.01 per hour "
+             "[to verify]). To keep that small, scripts/lab_stop.sh sets the service to 0 containers when I'm not "
+             "testing (the scans stay in S3), and lab_start.sh starts it again. S3 and CloudWatch Logs are billed "
+             "per request / per GB, the same as the ideal plan."),
+
+        heading("What I checked on AWS"),
+        bullet("scripts/lab_deploy.sh created the bucket, the ECR image, the security group, the cluster, the "
+               "task definition and the service, and the container started with a public IP."),
+        bullet("scripts/test_api.sh against the public URL: health check (it reports the S3 bucket), create, bad "
+               "input, read, list, update, delete and read-after-delete. All 9 checks pass "
+               "(evidence/test_api_output_aws.txt)."),
+        bullet("scripts/device_sim.py sent the sample graph photo and got back the 96 x 64 pin grid (401 raised "
+               "pins), the same result as locally."),
+        bullet("The scans are JSON files under scans/ in the bucket, and every request is logged in CloudWatch "
+               "(/ecs/brailliant-scan)."),
+
+        heading("If the full Learner Lab becomes available"),
+        para("Nothing in the code has to change: bash scripts/deploy.sh deploys the ideal version from "
+             "template.yaml (it uses LabRole automatically on Learner Lab)."),
     ]
 
 
@@ -189,16 +252,42 @@ SHOTS = [
      "START / END / REPORT lines for each request, with duration and memory."),
 ]
 
+AWS_SHOTS = [
+    ("A1_ecs_service.png", "A1. ECS service running",
+     "brailliant-cluster / brailliant-scan-service in the ECS console with 1 running task (Fargate)."),
+    ("A2_ecs_task.png", "A2. The running container",
+     "Task details: brailliant-scan task definition, PipelineRole, and the public IP the API is reached on."),
+    ("A3_ecr_image.png", "A3. Container image in ECR",
+     "The brailliant-scan repository with the image built and pushed by scripts/lab_deploy.sh."),
+    ("A4_s3_scans.png", "A4. Scans stored in S3",
+     "The scans/ folder in the bucket, one JSON file per scan job (S3 instead of DynamoDB in the lab)."),
+    ("A5_cloudwatch_logs.png", "A5. Container logs in CloudWatch",
+     "Log group /ecs/brailliant-scan with a START / END line for each request."),
+    ("A6_live_api_test.png", "A6. API test against AWS",
+     "scripts/test_api.sh against the container's public IP. All 9 checks pass "
+     "(full output in evidence/test_api_output_aws.txt)."),
+    ("A7_live_device_sim.png", "A7. Device simulator against AWS",
+     "A graph photo sent to the AWS deployment comes back as the 96 x 64 pin grid."),
+]
+
 
 def evidence():
     ev = ROOT / "evidence"
     body = [
         heading("Week 12 evidence"),
-        para("**Note:** these screenshots are from running the project locally, not on AWS, because my AWS "
-             "accounts are suspended (see L8). I used AWS SAM CLI to run the Lambda function and API in Docker, "
-             "and DynamoDB Local for the database. The same template.yaml deploys to AWS with sam deploy. "
-             "OCR (Textract) can only be shown after deploying."),
+        para("**Part A** is the deployment in the AWS Academy lab (ECS Fargate + S3, see the *Ideal plan vs lab "
+             "implementation* document for why). **Part L** is the ideal version (Lambda + API Gateway + DynamoDB "
+             "from template.yaml) tested locally with AWS SAM CLI and DynamoDB Local, because the lab doesn't "
+             "allow those services. OCR (Textract) isn't shown: it's blocked in the lab and can't run locally."),
     ]
+    if any((ev / shot[0]).exists() for shot in AWS_SHOTS):
+        body.append(heading("Part A: AWS Academy lab (ECS Fargate + S3)"))
+    for file, title, text in AWS_SHOTS:
+        if not (ev / file).exists():
+            print("missing, skipped:", file)
+            continue
+        body += [heading(title), para(text, keep_next=True), picture(ev / file, max_h_cm=10, keep_next=False)]
+    body += [page_break(), heading("Part L: ideal version, tested locally")]
     for file, title, text in SHOTS:
         if not (ev / file).exists():
             print("missing, skipped:", file)
@@ -209,10 +298,10 @@ def evidence():
     email = ev / "L8_aws_suspended_email.pdf"
     if email.exists():
         import pypdfium2 as pdfium
-        body += [page_break(), heading("L8. AWS suspension email"),
-                 para("This is why there are no screenshots from the AWS console. My personal AWS account was "
-                      "suspended on 24 Nov for identity verification, and my AWS Academy account is blocked too. "
-                      "I blacked out my email, the account ID and the upload link.", keep_next=True)]
+        body += [page_break(), heading("L8. AWS suspension email (personal account)"),
+                 para("My personal AWS account was suspended on 24 Nov for identity verification, which is why I "
+                      "first tested everything locally. I blacked out my email, the account ID and the upload link.",
+                      keep_next=True)]
         pdf = pdfium.PdfDocument(email)
         for i in range(min(2, len(pdf))):
             png = ROOT / "build" / f"email_{i}.png"
@@ -256,5 +345,7 @@ if __name__ == "__main__":
         write(ROOT / "docs" / "design_brief.docx", brief())
     elif which == "evidence":
         write(ROOT / "evidence" / "evidence.docx", evidence())
+    elif which == "implementation":
+        write(ROOT / "docs" / "lab_implementation.docx", implementation())
     else:
-        raise SystemExit("usage: python tools/fill_template.py brief|evidence")
+        raise SystemExit("usage: python tools/fill_template.py brief|evidence|implementation")

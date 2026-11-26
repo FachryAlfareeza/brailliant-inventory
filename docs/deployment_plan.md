@@ -55,3 +55,19 @@ Locally I can do everything except the OCR check and the console checks (see `ev
 No CloudWatch alarms on purpose: they bill per alarm per month, and BrAIlliant avoids
 anything billed by time. The budget alert covers cost mistakes.
 The full plan for the product is in the BrAIlliant cloud masterplan (AAKRUTI project folder).
+
+## What actually runs: the AWS Academy lab version
+
+The lab I was given only allows containers, so `scripts/lab_deploy.sh` deploys the same code differently
+(details and reasons in `docs/lab_implementation.docx`):
+
+| Ideal | Lab |
+|---|---|
+| API Gateway | container serves HTTP on a public IP, port 8080 |
+| Lambda | ECS Fargate (0.25 vCPU, 512 MB), image in ECR |
+| DynamoDB | S3 bucket `brailliant-scans-<account>`, one JSON file per scan |
+| own least-privilege role | the lab's `PipelineRole` |
+| Textract | off (no permission in the lab) |
+| SAM | AWS CLI + Docker |
+
+Fargate bills per second while running, so `scripts/lab_stop.sh` scales it to 0 when not in use.

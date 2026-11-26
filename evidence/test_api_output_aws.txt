@@ -1,0 +1,46 @@
+API test - http://44.203.99.127:8080 - 2026-11-26 12:55:38
+
+# health check (API -> code -> storage)
+$ curl -X GET http://44.203.99.127:8080/health 
+{"status": "ok", "storage": "s3://brailliant-scans-402337830412", "storageStatus": "ACTIVE", "ocr": false, "time": "2026-11-26T05:55:39+00:00"}
+PASS
+
+# create: graph photo -> 96 x 64 pins
+$ curl -X POST http://44.203.99.127:8080/scans -d '@build/graph_request.json'
+{"scanId": "S-c6c7b852eb", "deviceId": "brailliant-01", "mode": "graph", "label": "sample graph", "read": false, "createdAt": "2026-11-26T05:55:40+00:00", "method": "dark", "sourceSize": "1200x800", "width": 96, "height": 64, "dots": ["000000000000000000000000", "000000000000000000000000", "00000000 ...
+PASS
+
+# create: text -> Grade 1 braille
+$ curl -X POST http://44.203.99.127:8080/scans -d '{"deviceId":"brailliant-01","mode":"text","text":"F = m x a"}'
+{"scanId": "S-e48a980987", "deviceId": "brailliant-01", "mode": "text", "label": "", "read": false, "createdAt": "2026-11-26T05:55:41+00:00", "text": "F = m x a", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-26T05:55:41+00:00"}
+PASS
+
+# create: bad input
+$ curl -X POST http://44.203.99.127:8080/scans -d '{"deviceId":"brailliant-01","mode":"music"}'
+{"error": "'mode' must be 'graph' or 'text'"}
+PASS
+
+# read
+$ curl -X GET http://44.203.99.127:8080/scans/S-c6c7b852eb 
+{"scanId": "S-c6c7b852eb", "deviceId": "brailliant-01", "mode": "graph", "label": "sample graph", "read": false, "createdAt": "2026-11-26T05:55:40+00:00", "method": "dark", "sourceSize": "1200x800", "width": 96, "height": 64, "dots": ["000000000000000000000000", "000000000000000000000000", "00000000 ...
+PASS
+
+$ curl -X GET http://44.203.99.127:8080/scans?deviceId=brailliant-01 
+{"count": 4, "items": [{"scanId": "S-e48a980987", "deviceId": "brailliant-01", "mode": "text", "label": "", "read": false, "createdAt": "2026-11-26T05:55:41+00:00", "text": "F = m x a", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-26T05:55:41+00:00"} ...
+PASS
+
+# update
+$ curl -X PUT http://44.203.99.127:8080/scans/S-e48a980987 -d '{"label":"Physics p.12","read":true}'
+{"scanId": "S-e48a980987", "deviceId": "brailliant-01", "mode": "text", "label": "Physics p.12", "read": true, "createdAt": "2026-11-26T05:55:41+00:00", "text": "F = m x a", "braille": "\u2820\u280b \u283f \u280d \u282d \u2801", "status": "done", "updatedAt": "2026-11-26T05:55:44+00:00"}
+PASS
+
+# delete
+$ curl -X DELETE http://44.203.99.127:8080/scans/S-e48a980987 
+{"deleted": "S-e48a980987"}
+PASS
+
+$ curl -X GET http://44.203.99.127:8080/scans/S-e48a980987 
+{"error": "Scan 'S-e48a980987' not found"}
+PASS
+
+Failed: 0
