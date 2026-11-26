@@ -174,9 +174,12 @@ def implementation():
         heading("Ideal plan vs lab implementation"),
         para("The design (template.yaml) uses API Gateway, Lambda and DynamoDB. The AWS Academy lab I was given "
              "is set up for a containers exercise, so I checked what it allows with the IAM policy simulator "
-             "(aws iam simulate-principal-policy) and used the closest services it permits, as the lecturer asked."),
-        picture(ROOT / "docs" / "architecture_lab.png", max_h_cm=9),
-        para("*Figure 2. The lab version. Grey notes show what each part replaces in the ideal plan (Figure 1).*"),
+             "(aws iam simulate-principal-policy) and used the closest services it permits, as the lecturer asked. "
+             "The app code (app.py), the ScanJob entity, the endpoints and the tests are the same in both, and "
+             "on the full Learner Lab scripts/deploy.sh still deploys the ideal version unchanged."),
+        picture(ROOT / "docs" / "architecture_lab.png", max_h_cm=8),
+        para("*Figure 2. The lab version. Grey notes show what each part replaces in the ideal plan "
+             "(Figure 1 in the design brief).*"),
         table(["Allowed in the lab", "Not allowed in the lab"], [
             ["ECS (Fargate), ECR, S3 buckets, load balancers, security groups, CloudWatch Logs (through the "
              "container), Rekognition and Polly (my login only), CodeCommit / CodePipeline, Cloud9",
@@ -187,8 +190,12 @@ def implementation():
         heading("What changed and why"),
         table(["Ideal plan", "In the lab", "Why"], [
             ["API Gateway (HTTP API)", "The container serves HTTP itself on a public IP (port 8080)",
-             "API Gateway is blocked. A load balancer is allowed but is billed per hour, a public IP is free. "
+             "API Gateway is blocked. A load balancer is allowed but costs about $0.0225/hour even when idle; "
+             "a public IP is about $0.005/hour and only while the container runs. "
              "The cost: the address changes when the container restarts."],
+            ["HTTPS, throttled to 10 requests/s", "Plain HTTP on port 8080, open to the internet, no throttling",
+             "HTTPS needs a certificate on a load balancer or API Gateway. Fine for sample photos; real "
+             "device photos must not go over this."],
             ["Lambda + Pillow layer", "ECS Fargate container (image in ECR) running the same app.py, with a "
              "small web server (server.py) in front",
              "Lambda is blocked, ECS is what the lab is for. server.py turns each request into the same event "
@@ -209,8 +216,9 @@ def implementation():
 
         heading("Cost difference"),
         para("The ideal plan bills only per request, nothing while idle. **Fargate is the exception**: it bills "
-             "per second while the container runs (smallest size, 0.25 vCPU / 512 MB, roughly $0.01 per hour "
-             "[to verify]). To keep that small, scripts/lab_stop.sh sets the service to 0 containers when I'm not "
+             "per second while the container runs: the smallest size (0.25 vCPU / 512 MB) is about $0.012 per hour, "
+             "plus about $0.005 per hour for the public IP, so about $0.40 a day if I forgot to stop it "
+             "(us-east-1 prices). To keep that small, scripts/lab_stop.sh sets the service to 0 containers when I'm not "
              "testing (the scans stay in S3), and lab_start.sh starts it again. S3 and CloudWatch Logs are billed "
              "per request / per GB, the same as the ideal plan."),
 
@@ -219,15 +227,11 @@ def implementation():
                "task definition and the service, and the container started with a public IP."),
         bullet("scripts/test_api.sh against the public URL: health check (it reports the S3 bucket), create, bad "
                "input, read, list, update, delete and read-after-delete. All 9 checks pass "
-               "(evidence/test_api_output_aws.txt)."),
+               "(evidence/test_api_output_aws.txt). The scans are JSON files under scans/ in the bucket, and "
+               "every request is logged in CloudWatch (/ecs/brailliant-scan)."),
         bullet("scripts/device_sim.py sent the sample graph photo and got back the 96 x 64 pin grid (401 raised "
                "pins), the same result as locally."),
-        bullet("The scans are JSON files under scans/ in the bucket, and every request is logged in CloudWatch "
-               "(/ecs/brailliant-scan)."),
 
-        heading("If the full Learner Lab becomes available"),
-        para("Nothing in the code has to change: bash scripts/deploy.sh deploys the ideal version from "
-             "template.yaml (it uses LabRole automatically on Learner Lab)."),
     ]
 
 
